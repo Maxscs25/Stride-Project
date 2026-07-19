@@ -269,7 +269,7 @@ create table public.coach_links (
   coach_id uuid not null references public.profiles on delete cascade,
   athlete_id uuid not null references public.profiles on delete cascade,
   status text not null default 'invited' check (status in ('invited','active','revoked')),
-  invite_code text unique default encode(gen_random_bytes(6), 'hex'),
+  invite_code text unique default substr(md5(random()::text || clock_timestamp()::text), 1, 12),
   -- Single source of truth for what the coach may see (enforced by RLS)
   permissions jsonb not null default
     '{"mileage":true,"workouts":true,"wellness":true,"notes":false,"nutrition":false,"checklist":true}',
