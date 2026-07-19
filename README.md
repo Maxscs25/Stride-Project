@@ -1,56 +1,68 @@
-# Welcome to your Expo app 👋
+# Stride
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+AI-powered running app: training log, shoe mileage, recovery journal, daily
+checklist, and an injury-prevention coach that explains itself.
+Strava tells you what you ran — Stride keeps you running.
 
-## Get started
+Built with **Expo (React Native) + Supabase + Claude**, per the full design doc
+(architecture, schema, AI pipelines, pricing Model A) produced at project start.
 
-1. Install dependencies
+## Status — MVP scaffold (Phase 1)
 
-   ```bash
-   npm install
-   ```
+Working now, fully offline with seeded demo data:
 
-2. Start the app
+- **Today** — AI coach card (status + evidence + recommendations), weekly
+  mileage progress, daily checklist with streaks, worn-shoe alert
+- **Log** (FAB) — run / cross-training / journal entry, each ≤4 taps
+- **Training** — activity feed, shoe locker with wear bars, PRs
+- **Insights** — weekly mileage chart, acute:chronic load chart (ACWR),
+  recovery sparklines, consistency heatmap, weekly AI report
+- **Fuel** — dynamic calorie/macro targets (Mifflin-St Jeor + logged mileage),
+  functional hydration tracker; food logging is Phase 2
+- **Profile** — goals, Model A membership tiers, demo reset
 
-   ```bash
-   npx expo start
-   ```
+The "AI coach" currently runs on the **deterministic signal engine only**
+([src/lib/load.ts](src/lib/load.ts)): ACWR via EWMA, week-over-week ramp %,
+keyword symptom mining of journal notes, sleep debt, shoe wear, consistency
+wins. The Claude narration layer is stubbed in
+[supabase/functions/weekly-insight/index.ts](supabase/functions/weekly-insight/index.ts)
+and activates once Supabase is connected.
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it
 
 ```bash
-npm run reset-project
+npm install
+npx expo start          # then i / a / w for iOS / Android / web
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Demo data regenerates relative to today (Profile → Reset demo data).
 
-### Other setup steps
+## Wiring up Supabase (Phase 2)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+1. `npx supabase init && npx supabase link --project-ref <ref>`
+2. `npx supabase db push` — applies:
+   - [0001_schema.sql](supabase/migrations/0001_schema.sql) — full schema:
+     runs, shoes, journal + symptom tags, checklist, nutrition, form analyses,
+     coach links with permission JSON, signals/insights, jobs
+   - [0002_rls.sql](supabase/migrations/0002_rls.sql) — owner-only RLS +
+     `coach_can_view()` permission-scoped coach read policies
+   - [0003_signal_engine.sql](supabase/migrations/0003_signal_engine.sql) —
+     sRPE load, EWMA acute/chronic + ACWR, rule-based signal detection,
+     nightly pg_cron refresh
+3. `supabase secrets set ANTHROPIC_API_KEY=...` and
+   `supabase functions deploy weekly-insight`
+4. Add `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` to `.env`
+   and swap the local store for Supabase sync.
 
-## Learn more
+## Architecture notes
 
-To learn more about developing your project with Expo, look at the following resources:
+- **Three-layer AI**: SQL feature engine → deterministic rules → Claude
+  narration constrained to a curated exercise library. The model explains the
+  numbers; it never invents them.
+- **Privacy**: notes are athlete-private by default; coach access is per-scope
+  (`coach_links.permissions`) and enforced in RLS, not the UI.
+- **Pricing (Model A)**: Free logging forever · Premium $6.99/mo ($49.99/yr) ·
+  Coach Pro $9.99/mo — constants in
+  [src/constants/pricing.ts](src/constants/pricing.ts).
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+All AI output is educational training guidance, never diagnosis.
