@@ -7,6 +7,7 @@ import { ChecklistCard } from '@/components/ChecklistCard';
 import { InsightCard } from '@/components/InsightCard';
 import { Card, ProgressBar, Screen, SectionHeader, StatTile } from '@/components/ui';
 import { fmtLongDate, round1, todayKey, weekStartKey } from '@/lib/format';
+import { useInsights } from '@/lib/insights';
 import { buildInsight, shoeMiles, weeklyMiles } from '@/lib/load';
 import { currentStreak } from '@/lib/streaks';
 import { useAuth } from '@/lib/sync';
@@ -25,10 +26,12 @@ export default function Today() {
   const toggleItem = useApp((s) => s.toggleItem);
 
   const today = todayKey();
-  const insight = useMemo(
+  const remoteInsight = useInsights((s) => s.latest);
+  const localInsight = useMemo(
     () => buildInsight({ runs, cross, journal, shoes }),
     [runs, cross, journal, shoes]
   );
+  const insight = remoteInsight ?? localInsight;
 
   const week = weeklyMiles(runs, 0);
   const dow = new Date().getDay();

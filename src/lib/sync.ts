@@ -3,6 +3,7 @@ import * as Crypto from 'expo-crypto';
 import { create } from 'zustand';
 
 import { round1 } from './format';
+import { clearInsights, fetchLatestInsight } from './insights';
 import { supabase } from './supabase';
 import type { CrossSession, JournalEntry, Run, Shoe } from './types';
 import { useApp } from '@/store';
@@ -32,7 +33,10 @@ export function startAuthSync() {
   supabase.auth.onAuthStateChange((event, session) => {
     useAuth.setState({ session, ready: true });
     if (event === 'SIGNED_IN' && session) bootstrap(session);
-    if (event === 'SIGNED_OUT') useApp.getState().resetDemo();
+    if (event === 'SIGNED_OUT') {
+      clearInsights();
+      useApp.getState().resetDemo();
+    }
   });
 }
 
@@ -44,6 +48,7 @@ async function bootstrap(session: Session) {
     const name = session.user.email?.split('@')[0] ?? 'Runner';
     await supabase.from('profiles').upsert({ id: uid, display_name: name });
     await pullAll(name);
+    await fetchLatestInsight();
   } catch (e) {
     console.warn('sync bootstrap failed', e);
   } finally {

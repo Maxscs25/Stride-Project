@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { InsightCard } from '@/components/InsightCard';
 import { BarChart, Heatmap, LoadChart, SparkBars } from '@/components/charts';
 import { Card, Screen, SectionHeader } from '@/components/ui';
-import { addDays, parseKey, todayKey } from '@/lib/format';
+import { addDays, fmtDate, parseKey, todayKey } from '@/lib/format';
+import { generateInsight, useInsights } from '@/lib/insights';
 import { buildInsight, loadSeries, weeklyMileSeries } from '@/lib/load';
+import { useAuth } from '@/lib/sync';
 import { useApp } from '@/store';
 import { useTheme } from '@/theme';
 
@@ -19,10 +21,13 @@ export default function Insights() {
 
   const weekly = useMemo(() => weeklyMileSeries(runs, 8), [runs]);
   const series = useMemo(() => loadSeries(runs, cross, 56), [runs, cross]);
-  const insight = useMemo(
+  const localInsight = useMemo(
     () => buildInsight({ runs, cross, journal, shoes }),
     [runs, cross, journal, shoes]
   );
+  const { session } = useAuth();
+  const { latest: remoteInsight, generating, error } = useInsights();
+  const insight = remoteInsight ?? localInsight;
 
   const dailyMiles = useMemo(() => {
     const m = new Map<string, number>();
@@ -98,8 +103,36 @@ export default function Insights() {
         </Text>
       </Card>
 
-      <SectionHeader title="Weekly AI Report" />
+      <SectionHeader
+        title="Weekly AI Report"
+        right={
+          session ? (
+            <Pressable
+              onPress={generateInsight}
+              disabled={generating}
+              style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {generating ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800' }}>
+                  ✦ Generate
+                </Text>
+              )}
+            </Pressable>
+          ) : undefined
+        }
+      />
+      {error ? (
+        <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{error}</Text>
+      ) : null}
       <InsightCard insight={insight} />
+      <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: -6 }}>
+        {remoteInsight
+          ? `Written by your AI coach · ${fmtDate(remoteInsight.createdAt.slice(0, 10))}`
+          : session
+            ? 'On-device preview — tap Generate for your AI coach report.'
+            : 'On-device preview — sign in to get AI coach reports.'}
+      </Text>
     </Screen>
   );
 }
