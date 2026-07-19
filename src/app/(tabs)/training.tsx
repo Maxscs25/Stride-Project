@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Link } from 'expo-router';
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { WearBar } from '@/components/WearBar';
 import { Card, Screen, SectionHeader } from '@/components/ui';
@@ -41,7 +42,23 @@ export default function Training() {
         <Stat label="Logged total" value={`${Math.round(totalMiles)} mi`} />
       </Card>
 
-      <SectionHeader title="Shoe Locker" />
+      <SectionHeader
+        title="Shoe Locker"
+        right={
+          <Link href="/log/shoe" asChild>
+            <Pressable>
+              <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800' }}>+ Add</Text>
+            </Pressable>
+          </Link>
+        }
+      />
+      {shoes.filter((s) => !s.retiredAt).length === 0 ? (
+        <Card>
+          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+            No shoes yet — add your current pair to start tracking wear.
+          </Text>
+        </Card>
+      ) : null}
       {shoes
         .filter((s) => !s.retiredAt)
         .map((shoe) => {
@@ -79,6 +96,11 @@ export default function Training() {
 
       <SectionHeader title="Recent Activity" />
       <Card style={{ paddingVertical: 4 }}>
+        {feed.length === 0 ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 13, paddingVertical: 10 }}>
+            Nothing logged yet — tap + to record your first run.
+          </Text>
+        ) : null}
         {feed.map((item, i) => (
           <View
             key={item.kind === 'run' ? item.run.id : item.cross.id}
@@ -100,6 +122,11 @@ export default function Training() {
 
       <SectionHeader title="Personal Records" />
       <Card style={{ paddingVertical: 4 }}>
+        {prs.length === 0 ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 13, paddingVertical: 10 }}>
+            Race results will show up here.
+          </Text>
+        ) : null}
         {prs.map((pr, i) => (
           <View
             key={pr.dist}

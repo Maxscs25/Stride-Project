@@ -4,15 +4,14 @@ import { Pressable, Text, View } from 'react-native';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
 import { todayKey } from '@/lib/format';
+import { logCross } from '@/lib/sync';
 import { ACTIVITY_META, type ActivityType } from '@/lib/types';
-import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
 
 const ACTIVITIES = Object.entries(ACTIVITY_META) as [ActivityType, { label: string; icon: string }][];
 
 export default function LogCross() {
   const { colors } = useTheme();
-  const logCross = useApp((s) => s.logCross);
 
   const [activity, setActivity] = useState<ActivityType>('strength');
   const [minutes, setMinutes] = useState('');

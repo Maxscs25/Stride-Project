@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# env (Supabase keys are publishable, but keep real config out of git)
+.env

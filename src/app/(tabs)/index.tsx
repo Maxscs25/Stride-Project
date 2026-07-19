@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 
@@ -8,6 +9,7 @@ import { Card, ProgressBar, Screen, SectionHeader, StatTile } from '@/components
 import { fmtLongDate, round1, todayKey, weekStartKey } from '@/lib/format';
 import { buildInsight, shoeMiles, weeklyMiles } from '@/lib/load';
 import { currentStreak } from '@/lib/streaks';
+import { useAuth } from '@/lib/sync';
 import { useApp } from '@/store';
 import { useTheme } from '@/theme';
 
@@ -46,8 +48,30 @@ export default function Today() {
     [runs, today]
   );
 
+  const { session, ready } = useAuth();
+
   return (
     <Screen title="Today" subtitle={fmtLongDate(today)}>
+      {ready && !session ? (
+        <Card
+          onPress={() => router.push('/auth')}
+          style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons
+            name="cloud-upload"
+            size={20}
+            color={colors.accent}
+            style={{ marginRight: 12 }}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
+              You're looking at demo data
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+              Create a free account to start your real training log →
+            </Text>
+          </View>
+        </Card>
+      ) : null}
       <InsightCard insight={insight} />
 
       <SectionHeader title="This Week" />

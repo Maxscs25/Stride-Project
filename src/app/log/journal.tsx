@@ -4,14 +4,13 @@ import { Pressable, Text, View } from 'react-native';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
 import { todayKey } from '@/lib/format';
-import { useApp } from '@/store';
+import { addJournal } from '@/lib/sync';
 import { radius, useTheme } from '@/theme';
 
 const SCALE = [1, 2, 3, 4, 5].map((v) => ({ value: v, label: String(v) }));
 
 export default function LogJournal() {
   const { colors } = useTheme();
-  const addJournal = useApp((s) => s.addJournal);
 
   const [energy, setEnergy] = useState<number | undefined>();
   const [soreness, setSoreness] = useState<number | undefined>();

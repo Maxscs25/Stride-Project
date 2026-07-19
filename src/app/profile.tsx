@@ -1,9 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Alert, Platform, Pressable, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
 import { Card, Pill, SectionHeader } from '@/components/ui';
 import { TIERS } from '@/constants/pricing';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/sync';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
 
@@ -24,8 +27,37 @@ export default function Profile() {
     ]);
   };
 
+  const { session } = useAuth();
+
   return (
     <ModalShell title="Profile">
+      <SectionHeader title="Account" />
+      {session ? (
+        <Card>
+          <Row label="Signed in as" value={session.user.email ?? '—'} />
+          <Pressable
+            onPress={() => {
+              supabase.auth.signOut();
+              router.back();
+            }}
+            style={{ paddingVertical: 10 }}>
+            <Text style={{ color: colors.danger, fontSize: 14, fontWeight: '700' }}>Sign out</Text>
+          </Pressable>
+        </Card>
+      ) : (
+        <Card onPress={() => router.push('/auth')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="cloud-upload" size={20} color={colors.accent} style={{ marginRight: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
+              Sign in / create account
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+              Sync your training to the cloud — you're currently in demo mode.
+            </Text>
+          </View>
+        </Card>
+      )}
+
       <Card>
         <Row label="Name" value={profile.name} />
         <Row label="Race goal" value={profile.raceGoal} />

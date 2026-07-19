@@ -1,10 +1,15 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 
+import { startAuthSync } from '@/lib/sync';
 import { useTheme } from '@/theme';
 
 export default function RootLayout() {
   const { colors, dark } = useTheme();
+  useEffect(() => {
+    startAuthSync();
+  }, []);
   const navTheme = {
     ...(dark ? DarkTheme : DefaultTheme),
     colors: {
@@ -24,6 +29,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="log" options={{ presentation: 'modal' }} />
         <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="auth" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

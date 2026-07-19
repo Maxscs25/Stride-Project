@@ -5,6 +5,7 @@ import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
 import { addDays, fmtPace, todayKey } from '@/lib/format';
 import { shoeMiles } from '@/lib/load';
+import { logRun } from '@/lib/sync';
 import { WORKOUT_META, type WorkoutType } from '@/lib/types';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
@@ -15,7 +16,6 @@ export default function LogRun() {
   const { colors } = useTheme();
   const shoes = useApp((s) => s.shoes);
   const runs = useApp((s) => s.runs);
-  const logRun = useApp((s) => s.logRun);
 
   const [dayOffset, setDayOffset] = useState(0);
   const [distance, setDistance] = useState('');
