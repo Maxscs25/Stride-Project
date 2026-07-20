@@ -90,6 +90,7 @@ export async function pullAll(fallbackName?: string) {
     type: r.workout_type === 'fartlek' ? 'other' : r.workout_type,
     shoeId: r.shoe_id ?? undefined,
     rpe: r.rpe ?? undefined,
+    externalId: r.external_id ?? undefined,
   }));
   const cross: CrossSession[] = (crossQ.data ?? []).map((c) => ({
     id: c.id,

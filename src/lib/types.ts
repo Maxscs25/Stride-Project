@@ -17,6 +17,7 @@ export interface Run {
   shoeId?: string;
   rpe?: number; // 1-10
   note?: string;
+  externalId?: string; // dedupe key for imported runs (HealthKit UUID, Strava/Terra id)
 }
 
 export interface Shoe {

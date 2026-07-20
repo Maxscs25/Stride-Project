@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react
 import { ModalShell } from '@/components/ModalShell';
 import { Card, Pill, SectionHeader } from '@/components/ui';
 import { TIERS } from '@/constants/pricing';
+import { connectHealthKit, disconnectHealthKit, useHealthKit } from '@/lib/healthkit';
 import { checkStrava, connectStrava, disconnectStrava, useStrava } from '@/lib/strava';
 import { supabase } from '@/lib/supabase';
 import { pullAll, updateProfileRemote, useAuth } from '@/lib/sync';
@@ -33,6 +34,7 @@ export default function Profile() {
   const { session } = useAuth();
   const strava = useStrava();
   const terra = useTerra();
+  const healthkit = useHealthKit();
 
   useEffect(() => {
     if (session) {
@@ -182,6 +184,25 @@ export default function Profile() {
       </Card>
 
       <SectionHeader title="Connected Apps" />
+      {Platform.OS === 'ios' ? (
+        <ConnectRow
+          title="Apple Health"
+          subtitle={
+            healthkit.available
+              ? 'Garmin, COROS & Apple Watch runs via the Health app'
+              : 'Available in the iPhone app build (not Expo Go)'
+          }
+          icon="heart"
+          iconColor="#FF2D55"
+          connected={healthkit.connected}
+          busy={healthkit.busy}
+          error={healthkit.error}
+          onPress={() => {
+            if (healthkit.connected) disconnectHealthKit();
+            else connectHealthKit();
+          }}
+        />
+      ) : null}
       <ConnectRow
         title={terra.connected && terra.provider ? `Watch Sync · ${terra.provider}` : 'Watch Sync'}
         subtitle={
