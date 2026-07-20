@@ -9,6 +9,7 @@ import { TIERS } from '@/constants/pricing';
 import { checkStrava, connectStrava, disconnectStrava, useStrava } from '@/lib/strava';
 import { supabase } from '@/lib/supabase';
 import { pullAll, useAuth } from '@/lib/sync';
+import { checkTerra, connectTerra, disconnectTerra, useTerra } from '@/lib/terra';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
 
@@ -31,31 +32,39 @@ export default function Profile() {
 
   const { session } = useAuth();
   const strava = useStrava();
+  const terra = useTerra();
 
   useEffect(() => {
-    if (session) checkStrava();
+    if (session) {
+      checkStrava();
+      checkTerra();
+    }
   }, [session]);
 
-  const onStravaPress = async () => {
-    if (!session) {
-      router.push('/auth');
-      return;
-    }
-    if (strava.connected) {
-      const doDisconnect = () => disconnectStrava();
-      if (Platform.OS === 'web') {
-        doDisconnect();
-      } else {
-        Alert.alert('Disconnect Strava?', 'New watch runs will stop importing.', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Disconnect', style: 'destructive', onPress: doDisconnect },
-        ]);
+  const pressHandler =
+    (name: string, connected: boolean | null, connect: () => Promise<boolean>, disconnect: () => Promise<void>) =>
+    async () => {
+      if (!session) {
+        router.push('/auth');
+        return;
       }
-      return;
-    }
-    const ok = await connectStrava();
-    if (ok) await pullAll();
-  };
+      if (connected) {
+        if (Platform.OS === 'web') {
+          disconnect();
+        } else {
+          Alert.alert(`Disconnect ${name}?`, 'New watch runs will stop importing.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Disconnect', style: 'destructive', onPress: () => disconnect() },
+          ]);
+        }
+        return;
+      }
+      const ok = await connect();
+      if (ok) await pullAll();
+    };
+
+  const onTerraPress = pressHandler('watch sync', terra.connected, connectTerra, disconnectTerra);
+  const onStravaPress = pressHandler('Strava', strava.connected, connectStrava, disconnectStrava);
 
   return (
     <ModalShell title="Profile">
@@ -159,38 +168,34 @@ export default function Profile() {
       </Card>
 
       <SectionHeader title="Connected Apps" />
-      <Card onPress={onStravaPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 12,
-            backgroundColor: '#FC520022',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginRight: 12,
-          }}>
-          <Ionicons name="flash" size={18} color="#FC5200" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>Strava</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
-            {session
-              ? 'Auto-import runs from Garmin, COROS & Apple Watch'
-              : 'Sign in first, then connect to auto-import watch runs'}
-          </Text>
-          {strava.error ? (
-            <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4 }}>{strava.error}</Text>
-          ) : null}
-        </View>
-        {strava.busy ? (
-          <ActivityIndicator size="small" color={colors.accent} />
-        ) : session && strava.connected ? (
-          <Pill label="CONNECTED" color={colors.bg} bg={colors.good} />
-        ) : (
-          <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800' }}>Connect →</Text>
-        )}
-      </Card>
+      <ConnectRow
+        title={terra.connected && terra.provider ? `Watch Sync · ${terra.provider}` : 'Watch Sync'}
+        subtitle={
+          session
+            ? 'Garmin, COROS, Polar, Suunto & more — direct via Terra'
+            : 'Sign in first, then connect your watch'
+        }
+        icon="watch"
+        iconColor="#2DD4BF"
+        connected={!!session && !!terra.connected}
+        busy={terra.busy}
+        error={terra.error}
+        onPress={onTerraPress}
+      />
+      <ConnectRow
+        title="Strava"
+        subtitle={
+          session
+            ? 'Alternative sync path (requires a Strava subscription)'
+            : 'Sign in first to connect Strava'
+        }
+        icon="flash"
+        iconColor="#FC5200"
+        connected={!!session && !!strava.connected}
+        busy={strava.busy}
+        error={strava.error}
+        onPress={onStravaPress}
+      />
 
       <SectionHeader title="Coaching" />
       <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -219,6 +224,60 @@ export default function Profile() {
         not diagnose injuries. All data stays on this device until cloud sync is enabled.
       </Text>
     </ModalShell>
+  );
+}
+
+function ConnectRow({
+  title,
+  subtitle,
+  icon,
+  iconColor,
+  connected,
+  busy,
+  error,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  icon: string;
+  iconColor: string;
+  connected: boolean;
+  busy: boolean;
+  error: string | null;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Card onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          backgroundColor: iconColor + '22',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        }}>
+        <Ionicons name={icon as never} size={18} color={iconColor} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>{title}</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
+          {subtitle}
+        </Text>
+        {error ? (
+          <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4 }}>{error}</Text>
+        ) : null}
+      </View>
+      {busy ? (
+        <ActivityIndicator size="small" color={colors.accent} />
+      ) : connected ? (
+        <Pill label="CONNECTED" color={colors.bg} bg={colors.good} />
+      ) : (
+        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800' }}>Connect →</Text>
+      )}
+    </Card>
   );
 }
 

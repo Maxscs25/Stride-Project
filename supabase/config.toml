@@ -417,3 +417,8 @@ enabled = true
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/strava/index.ts"
+
+[functions.terra]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/terra/index.ts"
