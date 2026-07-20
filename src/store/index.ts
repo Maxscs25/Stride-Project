@@ -19,7 +19,7 @@ interface RemoteData {
   cross: CrossSession[];
   journal: JournalEntry[];
   shoes: Shoe[];
-  name?: string;
+  profile?: Partial<Profile>;
 }
 
 interface AppState extends SeedData {
@@ -33,6 +33,8 @@ interface AppState extends SeedData {
   toggleItem: (date: string, key: string) => void;
   addWater: (ml: number) => void;
   setWeeklyGoal: (mi: number) => void;
+  setProfile: (p: Partial<Profile>) => void;
+  setChecklistDisabled: (key: string, disabled: boolean) => void;
   /** Replace demo data with the signed-in user's cloud data. */
   hydrateRemote: (d: RemoteData) => void;
   resetDemo: () => void;
@@ -99,6 +101,13 @@ export const useApp = create<AppState>()(
       setWeeklyGoal: (mi) =>
         set((s) => ({ profile: { ...s.profile, weeklyGoalMi: Math.max(5, mi) } })),
 
+      setProfile: (p) => set((s) => ({ profile: { ...s.profile, ...p } })),
+
+      setChecklistDisabled: (key, disabled) =>
+        set((s) => ({
+          checklistDefs: s.checklistDefs.map((d) => (d.key === key ? { ...d, disabled } : d)),
+        })),
+
       hydrateRemote: (d) =>
         set((s) => {
           // Demo-only artifacts don't carry into a real account; auto-tracked
@@ -117,7 +126,7 @@ export const useApp = create<AppState>()(
             hydration: s.demoMode ? {} : s.hydration,
             prs: s.demoMode ? [] : s.prs,
             demoMode: false,
-            profile: d.name ? { ...s.profile, name: d.name } : s.profile,
+            profile: d.profile ? { ...s.profile, ...d.profile } : s.profile,
           };
         }),
 

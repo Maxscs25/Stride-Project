@@ -30,6 +30,8 @@ export default function RootLayout() {
         <Stack.Screen name="log" options={{ presentation: 'modal' }} />
         <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
         <Stack.Screen name="auth" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="onboarding" options={{ presentation: 'modal', gestureEnabled: false }} />
+        <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

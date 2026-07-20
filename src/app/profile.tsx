@@ -8,7 +8,7 @@ import { Card, Pill, SectionHeader } from '@/components/ui';
 import { TIERS } from '@/constants/pricing';
 import { checkStrava, connectStrava, disconnectStrava, useStrava } from '@/lib/strava';
 import { supabase } from '@/lib/supabase';
-import { pullAll, useAuth } from '@/lib/sync';
+import { pullAll, updateProfileRemote, useAuth } from '@/lib/sync';
 import { checkTerra, connectTerra, disconnectTerra, useTerra } from '@/lib/terra';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
@@ -107,7 +107,14 @@ export default function Profile() {
           }}>
           <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Weekly mileage goal</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Stepper onPress={() => setWeeklyGoal(profile.weeklyGoalMi - 1)} icon="remove" />
+            <Stepper
+              onPress={() => {
+                const next = Math.max(5, profile.weeklyGoalMi - 1);
+                setWeeklyGoal(next);
+                updateProfileRemote({ weekly_goal_mi: next });
+              }}
+              icon="remove"
+            />
             <Text
               style={{
                 color: colors.text,
@@ -119,7 +126,14 @@ export default function Profile() {
               }}>
               {profile.weeklyGoalMi} mi
             </Text>
-            <Stepper onPress={() => setWeeklyGoal(profile.weeklyGoalMi + 1)} icon="add" />
+            <Stepper
+              onPress={() => {
+                const next = profile.weeklyGoalMi + 1;
+                setWeeklyGoal(next);
+                updateProfileRemote({ weekly_goal_mi: next });
+              }}
+              icon="add"
+            />
           </View>
         </View>
       </Card>
@@ -198,20 +212,31 @@ export default function Profile() {
       />
 
       <SectionHeader title="Coaching" />
-      <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Card
+        onPress={() => router.push('/coach')}
+        style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Ionicons name="people" size={20} color={colors.info} style={{ marginRight: 12 }} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
-            Invite your coach
+            Coaching & sharing
           </Text>
           <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
-            Share mileage and workouts with granular privacy controls. Arrives with accounts in
-            Phase 2 ({TIERS.coach.name}, {TIERS.coach.price}).
+            Invite your coach with granular privacy controls, or manage your athletes.
           </Text>
         </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </Card>
 
       <SectionHeader title="Data" />
+      <Card
+        onPress={() => router.push('/onboarding')}
+        style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons name="options" size={18} color={colors.info} style={{ marginRight: 12 }} />
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', flex: 1 }}>
+          Edit goals & profile
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Card>
       <Card onPress={confirmReset} style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Ionicons name="refresh" size={18} color={colors.danger} style={{ marginRight: 12 }} />
         <Text style={{ color: colors.danger, fontSize: 14, fontWeight: '700' }}>

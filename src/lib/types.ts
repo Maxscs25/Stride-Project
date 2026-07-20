@@ -66,6 +66,7 @@ export interface ChecklistDef {
   icon: string; // Ionicons name
   auto?: 'run' | 'journal';
   days?: number[]; // JS getDay() values; undefined = every day
+  disabled?: boolean; // hidden from the daily checklist (user-toggled in onboarding)
 }
 
 export interface PersonalRecord {
@@ -82,6 +83,7 @@ export interface Profile {
   weightKg: number;
   age: number;
   sex: 'male' | 'female';
+  experience?: 'new' | 'regular' | 'competitive';
 }
 
 export const WORKOUT_META: Record<WorkoutType, { label: string; color: string }> = {

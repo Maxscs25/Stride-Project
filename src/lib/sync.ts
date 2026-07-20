@@ -6,7 +6,7 @@ import { clearInsights, fetchLatestInsight } from './insights';
 import { checkStrava, clearStrava } from './strava';
 import { checkTerra, clearTerra } from './terra';
 import { supabase } from './supabase';
-import type { CrossSession, JournalEntry, Run, Shoe } from './types';
+import type { CrossSession, JournalEntry, Profile, Run, Shoe } from './types';
 import { useApp } from '@/store';
 
 /**
@@ -16,9 +16,14 @@ import { useApp } from '@/store';
  * the background; on sign-in the store is hydrated from the cloud.
  */
 
-export const useAuth = create<{ session: Session | null; ready: boolean }>(() => ({
+export const useAuth = create<{
+  session: Session | null;
+  ready: boolean;
+  needsOnboarding: boolean;
+}>(() => ({
   session: null,
   ready: false,
+  needsOnboarding: false,
 }));
 
 let started = false;
@@ -49,7 +54,10 @@ async function bootstrap(session: Session) {
   try {
     const uid = session.user.id;
     const name = session.user.email?.split('@')[0] ?? 'Runner';
-    await supabase.from('profiles').upsert({ id: uid, display_name: name });
+    // Insert-if-missing only — never clobber an onboarded display name
+    await supabase
+      .from('profiles')
+      .upsert({ id: uid, display_name: name }, { ignoreDuplicates: true });
     await pullAll(name);
     await Promise.all([fetchLatestInsight(), checkStrava(), checkTerra()]);
   } catch (e) {
@@ -61,12 +69,17 @@ async function bootstrap(session: Session) {
 
 const M_PER_MI = 1609.34;
 
-export async function pullAll(name?: string) {
-  const [runsQ, crossQ, journalQ, shoesQ] = await Promise.all([
+export async function pullAll(fallbackName?: string) {
+  const { data: sess } = await supabase.auth.getSession();
+  const uid = sess.session?.user.id;
+  if (!uid) return;
+
+  const [runsQ, crossQ, journalQ, shoesQ, profileQ] = await Promise.all([
     supabase.from('runs').select('*').order('local_date', { ascending: true }),
     supabase.from('cross_training').select('*').order('local_date', { ascending: true }),
     supabase.from('journal_entries').select('*').order('local_date', { ascending: true }),
     supabase.from('shoes').select('*'),
+    supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
   ]);
 
   const runs: Run[] = (runsQ.data ?? []).map((r) => ({
@@ -107,7 +120,34 @@ export async function pullAll(name?: string) {
     retiredAt: s.retired_at,
   }));
 
-  useApp.getState().hydrateRemote({ runs, cross, journal, shoes, name });
+  const p = profileQ.data;
+  const profile: Partial<Profile> = {};
+  if (p) {
+    if (p.display_name) profile.name = p.display_name;
+    if (p.weekly_goal_mi != null) profile.weeklyGoalMi = Number(p.weekly_goal_mi);
+    if (p.race_goal) profile.raceGoal = p.race_goal;
+    if (p.age != null) profile.age = p.age;
+    if (p.height_cm != null) profile.heightCm = Number(p.height_cm);
+    if (p.weight_kg != null) profile.weightKg = Number(p.weight_kg);
+    if (p.gender === 'male' || p.gender === 'female') profile.sex = p.gender;
+    if (p.experience_level === 'new' || p.experience_level === 'regular' || p.experience_level === 'competitive') {
+      profile.experience = p.experience_level;
+    }
+  } else if (fallbackName) {
+    profile.name = fallbackName;
+  }
+  useAuth.setState({ needsOnboarding: !p?.onboarded_at });
+
+  useApp.getState().hydrateRemote({ runs, cross, journal, shoes, profile });
+}
+
+/** Push profile/goal fields (snake_case columns) to the signed-in user's row. */
+export async function updateProfileRemote(fields: Record<string, unknown>) {
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user.id;
+  if (!uid) return;
+  const { error } = await supabase.from('profiles').update(fields).eq('id', uid);
+  if (error) console.warn('profile sync failed:', error.message);
 }
 
 function userId(): string | null {

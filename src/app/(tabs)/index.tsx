@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Text, View } from 'react-native';
 
 import { ChecklistCard } from '@/components/ChecklistCard';
@@ -35,7 +35,9 @@ export default function Today() {
 
   const week = weeklyMiles(runs, 0);
   const dow = new Date().getDay();
-  const items = checklistDefs.filter((d) => !d.days || d.days.includes(dow));
+  const items = checklistDefs.filter(
+    (d) => !d.disabled && (!d.days || d.days.includes(dow))
+  );
   const done = completions[today] ?? {};
   const doneCount = items.filter((i) => done[i.key]).length;
   const streaks = Object.fromEntries(
@@ -52,6 +54,14 @@ export default function Today() {
   );
 
   const { session, ready } = useAuth();
+  const needsOnboarding = useAuth((s) => s.needsOnboarding);
+
+  useEffect(() => {
+    if (needsOnboarding && session) {
+      useAuth.setState({ needsOnboarding: false });
+      router.push('/onboarding');
+    }
+  }, [needsOnboarding, session]);
 
   return (
     <Screen title="Today" subtitle={fmtLongDate(today)}>
