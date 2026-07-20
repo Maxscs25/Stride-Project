@@ -1,8 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
-import * as Crypto from 'expo-crypto';
 import { create } from 'zustand';
 
-import { round1 } from './format';
+import { round1, uuid } from './format';
 import { clearInsights, fetchLatestInsight } from './insights';
 import { checkStrava, clearStrava } from './strava';
 import { checkTerra, clearTerra } from './terra';
@@ -124,9 +123,9 @@ function warnOnError(label: string) {
 /** Log a run locally + push. A run note also becomes a journal entry so the
  *  AI symptom mining sees it. */
 export function logRun(input: Omit<Run, 'id'>) {
-  const id = Crypto.randomUUID();
+  const id = uuid();
   useApp.getState().logRun({ ...input, id });
-  const jid = Crypto.randomUUID();
+  const jid = uuid();
   if (input.note) {
     useApp.getState().addJournal({ date: input.date, note: input.note, id: jid });
   }
@@ -157,7 +156,7 @@ export function logRun(input: Omit<Run, 'id'>) {
 }
 
 export function logCross(input: Omit<CrossSession, 'id'>) {
-  const id = Crypto.randomUUID();
+  const id = uuid();
   useApp.getState().logCross({ ...input, id });
   const uid = userId();
   if (!uid) return;
@@ -176,7 +175,7 @@ export function logCross(input: Omit<CrossSession, 'id'>) {
 }
 
 export function addJournal(input: Omit<JournalEntry, 'id'>) {
-  const id = Crypto.randomUUID();
+  const id = uuid();
   useApp.getState().addJournal({ ...input, id });
   const uid = userId();
   if (!uid) return;
@@ -197,7 +196,7 @@ export function addJournal(input: Omit<JournalEntry, 'id'>) {
 }
 
 export function addShoe(input: Omit<Shoe, 'id'>) {
-  const id = Crypto.randomUUID();
+  const id = uuid();
   useApp.getState().addShoe({ ...input, id });
   const uid = userId();
   if (!uid) return;

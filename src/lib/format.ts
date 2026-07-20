@@ -1,3 +1,5 @@
+import * as Crypto from 'expo-crypto';
+
 export function dateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -59,5 +61,26 @@ export function fmtLongDate(k: string): string {
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+/**
+ * RFC 4122 v4 UUID that also works outside secure contexts (plain-HTTP LAN
+ * preview, older webviews), where crypto.randomUUID is unavailable.
+ */
+export function uuid(): string {
+  try {
+    return Crypto.randomUUID();
+  } catch {
+    let bytes: Uint8Array;
+    try {
+      bytes = Crypto.getRandomBytes(16);
+    } catch {
+      bytes = new Uint8Array(16).map(() => Math.floor(Math.random() * 256));
+    }
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const h = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  }
+}
 
 export const round1 = (n: number) => Math.round(n * 10) / 10;
