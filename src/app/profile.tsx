@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
 import { Card, Pill, SectionHeader } from '@/components/ui';
 import { TIERS } from '@/constants/pricing';
+import { checkStrava, connectStrava, disconnectStrava, useStrava } from '@/lib/strava';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/sync';
+import { pullAll, useAuth } from '@/lib/sync';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
 
@@ -28,6 +30,32 @@ export default function Profile() {
   };
 
   const { session } = useAuth();
+  const strava = useStrava();
+
+  useEffect(() => {
+    if (session) checkStrava();
+  }, [session]);
+
+  const onStravaPress = async () => {
+    if (!session) {
+      router.push('/auth');
+      return;
+    }
+    if (strava.connected) {
+      const doDisconnect = () => disconnectStrava();
+      if (Platform.OS === 'web') {
+        doDisconnect();
+      } else {
+        Alert.alert('Disconnect Strava?', 'New watch runs will stop importing.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Disconnect', style: 'destructive', onPress: doDisconnect },
+        ]);
+      }
+      return;
+    }
+    const ok = await connectStrava();
+    if (ok) await pullAll();
+  };
 
   return (
     <ModalShell title="Profile">
@@ -128,6 +156,40 @@ export default function Profile() {
         <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: 'center', marginTop: 8 }}>
           Billing wires up via RevenueCat in Phase 2.
         </Text>
+      </Card>
+
+      <SectionHeader title="Connected Apps" />
+      <Card onPress={onStravaPress} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            backgroundColor: '#FC520022',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+          }}>
+          <Ionicons name="flash" size={18} color="#FC5200" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>Strava</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
+            {session
+              ? 'Auto-import runs from Garmin, COROS & Apple Watch'
+              : 'Sign in first, then connect to auto-import watch runs'}
+          </Text>
+          {strava.error ? (
+            <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4 }}>{strava.error}</Text>
+          ) : null}
+        </View>
+        {strava.busy ? (
+          <ActivityIndicator size="small" color={colors.accent} />
+        ) : session && strava.connected ? (
+          <Pill label="CONNECTED" color={colors.bg} bg={colors.good} />
+        ) : (
+          <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800' }}>Connect →</Text>
+        )}
       </Card>
 
       <SectionHeader title="Coaching" />
