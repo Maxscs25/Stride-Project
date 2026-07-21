@@ -107,23 +107,43 @@ function toSeconds(q?: QuantityLike | number): number {
   return v; // seconds
 }
 
+interface RawWorkout {
+  uuid: string;
+  startDate: Date | string;
+  duration?: QuantityLike;
+  totalDistance?: QuantityLike;
+  workoutActivityType?: number;
+}
+
 /** Import running workouts from the last 60 days; dedupe on workout UUID. */
 export async function syncHealthKitRuns(): Promise<number> {
   if (!HK || !useHealthKit.getState().connected) return 0;
 
-  const workouts: {
-    uuid: string;
-    startDate: Date | string;
-    duration?: QuantityLike;
-    totalDistance?: QuantityLike;
-  }[] = await HK.queryWorkoutSamples({
-    filter: {
-      workoutActivityType: RUNNING,
-      date: { startDate: new Date(Date.now() - 60 * 864e5) },
-    },
-    limit: 0, // all
-    ascending: true,
-  });
+  // Query WITHOUT the native activity-type filter, then select runs in JS.
+  // This is more robust than trusting the filter to match how every source
+  // (Garmin, COROS, Apple Watch) tags a run, and lets us log what came back.
+  let workouts: RawWorkout[] = [];
+  try {
+    workouts = await HK.queryWorkoutSamples({
+      filter: { date: { startDate: new Date(Date.now() - 60 * 864e5) } },
+      limit: 0, // all
+      ascending: true,
+    });
+  } catch (e) {
+    console.warn('[healthkit] query failed', e);
+    useHealthKit.setState({ error: 'Could not read workouts from Apple Health.' });
+    return 0;
+  }
+
+  const runs = workouts.filter((w) => (w.workoutActivityType ?? RUNNING) === RUNNING);
+  console.log(
+    `[healthkit] ${workouts.length} workouts in last 60d, ${runs.length} are runs`
+  );
+  if (workouts.length === 0) {
+    // Either no data reached Apple Health, or read permission wasn't granted
+    // (iOS hides read denials). Flag it so the UI can guide the user.
+    useHealthKit.setState({ imported: 0, error: null });
+  }
 
   const app = useApp.getState();
   const known = new Set(app.runs.map((r) => r.externalId).filter(Boolean));
@@ -132,12 +152,15 @@ export async function syncHealthKitRuns(): Promise<number> {
 
   let added = 0;
   const remoteRows: Record<string, unknown>[] = [];
-  for (const w of workouts) {
+  for (const w of runs) {
     const ext = String(w.uuid);
     if (!ext || known.has(ext)) continue;
     const meters = toMeters(w.totalDistance);
     const seconds = Math.round(toSeconds(w.duration));
-    if (meters < 400 || seconds <= 0) continue; // skip fragments
+    if (meters < 400 || seconds <= 0) {
+      console.log(`[healthkit] skipped run ${ext.slice(0, 8)} (m=${meters}, s=${seconds})`);
+      continue; // skip fragments
+    }
     const start = new Date(w.startDate);
     const run = {
       id: uuid(),
@@ -169,8 +192,9 @@ export async function syncHealthKitRuns(): Promise<number> {
     const { error } = await supabase
       .from('runs')
       .upsert(remoteRows, { onConflict: 'user_id,source,external_id' });
-    if (error) console.warn('healthkit run sync failed:', error.message);
+    if (error) console.warn('[healthkit] run sync failed:', error.message);
   }
+  console.log(`[healthkit] imported ${added} new run(s)`);
   useHealthKit.setState({ imported: added });
   return added;
 }

@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react
 import { ModalShell } from '@/components/ModalShell';
 import { Card, Pill, SectionHeader } from '@/components/ui';
 import { TIERS } from '@/constants/pricing';
-import { connectHealthKit, disconnectHealthKit, useHealthKit } from '@/lib/healthkit';
+import { connectHealthKit, syncHealthKitRuns, useHealthKit } from '@/lib/healthkit';
 import { checkStrava, connectStrava, disconnectStrava, useStrava } from '@/lib/strava';
 import { supabase } from '@/lib/supabase';
 import { pullAll, updateProfileRemote, useAuth } from '@/lib/sync';
@@ -188,9 +188,15 @@ export default function Profile() {
         <ConnectRow
           title="Apple Health"
           subtitle={
-            healthkit.available
-              ? 'Garmin, COROS & Apple Watch runs via the Health app'
-              : 'Available in the iPhone app build (not Expo Go)'
+            !healthkit.available
+              ? 'Available in the iPhone app build (not Expo Go)'
+              : !healthkit.connected
+                ? 'Garmin, COROS & Apple Watch runs via the Health app'
+                : healthkit.imported == null
+                  ? 'Connected · tap to sync now'
+                  : healthkit.imported > 0
+                    ? `Imported ${healthkit.imported} run(s) · tap to sync again`
+                    : 'No runs found in Apple Health — tap to retry'
           }
           icon="heart"
           iconColor="#FF2D55"
@@ -198,8 +204,12 @@ export default function Profile() {
           busy={healthkit.busy}
           error={healthkit.error}
           onPress={() => {
-            if (healthkit.connected) disconnectHealthKit();
-            else connectHealthKit();
+            if (healthkit.connected) {
+              useHealthKit.setState({ busy: true });
+              syncHealthKitRuns().finally(() => useHealthKit.setState({ busy: false }));
+            } else {
+              connectHealthKit();
+            }
           }}
         />
       ) : null}
