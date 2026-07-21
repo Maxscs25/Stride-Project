@@ -6,6 +6,7 @@ import { todayKey, uid } from '@/lib/format';
 import { buildSeed, type SeedData } from '@/lib/seed';
 import type {
   CrossSession,
+  FoodLog,
   JournalEntry,
   Profile,
   Run,
@@ -19,6 +20,7 @@ interface RemoteData {
   cross: CrossSession[];
   journal: JournalEntry[];
   shoes: Shoe[];
+  foodLogs: FoodLog[];
   profile?: Partial<Profile>;
 }
 
@@ -30,6 +32,8 @@ interface AppState extends SeedData {
   logCross: (c: WithOptionalId<CrossSession>) => void;
   addJournal: (j: WithOptionalId<JournalEntry>) => void;
   addShoe: (s: WithOptionalId<Shoe>) => void;
+  logFood: (f: WithOptionalId<FoodLog>) => void;
+  deleteFood: (id: string) => void;
   toggleItem: (date: string, key: string) => void;
   addWater: (ml: number) => void;
   setWeeklyGoal: (mi: number) => void;
@@ -81,6 +85,12 @@ export const useApp = create<AppState>()(
       addShoe: (shoe) =>
         set((s) => ({ shoes: [...s.shoes, { ...shoe, id: shoe.id ?? uid() }] })),
 
+      logFood: (f) =>
+        set((s) => ({ foodLogs: [...s.foodLogs, { ...f, id: f.id ?? uid() }] })),
+
+      deleteFood: (id) =>
+        set((s) => ({ foodLogs: s.foodLogs.filter((f) => f.id !== id) })),
+
       toggleItem: (date, key) =>
         set((s) => ({
           completions: {
@@ -122,6 +132,7 @@ export const useApp = create<AppState>()(
             cross: d.cross,
             journal: d.journal,
             shoes: d.shoes,
+            foodLogs: d.foodLogs,
             completions,
             hydration: s.demoMode ? {} : s.hydration,
             prs: s.demoMode ? [] : s.prs,

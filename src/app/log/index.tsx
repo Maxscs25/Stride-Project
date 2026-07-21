@@ -19,6 +19,12 @@ const OPTIONS = [
     sub: 'Bike, swim, strength, yoga & more',
   },
   {
+    href: '/log/food',
+    icon: 'nutrition',
+    title: 'Log Food',
+    sub: 'Search, scan a barcode, or enter manually',
+  },
+  {
     href: '/log/journal',
     icon: 'create',
     title: 'Journal Entry',

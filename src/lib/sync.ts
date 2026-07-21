@@ -6,7 +6,7 @@ import { clearInsights, fetchLatestInsight } from './insights';
 import { checkStrava, clearStrava } from './strava';
 import { checkTerra, clearTerra } from './terra';
 import { supabase } from './supabase';
-import type { CrossSession, JournalEntry, Profile, Run, Shoe } from './types';
+import type { CrossSession, FoodLog, JournalEntry, Profile, Run, Shoe } from './types';
 import { useApp } from '@/store';
 
 /**
@@ -74,11 +74,15 @@ export async function pullAll(fallbackName?: string) {
   const uid = sess.session?.user.id;
   if (!uid) return;
 
-  const [runsQ, crossQ, journalQ, shoesQ, profileQ] = await Promise.all([
+  const [runsQ, crossQ, journalQ, shoesQ, foodQ, profileQ] = await Promise.all([
     supabase.from('runs').select('*').order('local_date', { ascending: true }),
     supabase.from('cross_training').select('*').order('local_date', { ascending: true }),
     supabase.from('journal_entries').select('*').order('local_date', { ascending: true }),
     supabase.from('shoes').select('*'),
+    supabase
+      .from('food_logs')
+      .select('*')
+      .gte('local_date', new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
     supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
   ]);
 
@@ -120,6 +124,18 @@ export async function pullAll(fallbackName?: string) {
     isDefault: s.is_default,
     retiredAt: s.retired_at,
   }));
+  const foodLogs: FoodLog[] = (foodQ.data ?? []).map((f) => ({
+    id: f.id,
+    date: f.local_date,
+    meal: f.meal ?? 'snack',
+    name: f.custom_name ?? 'Food',
+    servings: Number(f.servings ?? 1),
+    calories: Math.round(Number(f.calories ?? 0)),
+    proteinG: Math.round(Number(f.protein_g ?? 0)),
+    carbsG: Math.round(Number(f.carbs_g ?? 0)),
+    fatG: Math.round(Number(f.fat_g ?? 0)),
+    entryMethod: f.entry_method ?? 'search',
+  }));
 
   const p = profileQ.data;
   const profile: Partial<Profile> = {};
@@ -139,7 +155,7 @@ export async function pullAll(fallbackName?: string) {
   }
   useAuth.setState({ needsOnboarding: !p?.onboarded_at });
 
-  useApp.getState().hydrateRemote({ runs, cross, journal, shoes, profile });
+  useApp.getState().hydrateRemote({ runs, cross, journal, shoes, foodLogs, profile });
 }
 
 /** Push profile/goal fields (snake_case columns) to the signed-in user's row. */
@@ -254,4 +270,33 @@ export function addShoe(input: Omit<Shoe, 'id'>) {
       is_default: input.isDefault ?? false,
     })
     .then(warnOnError('shoe'));
+}
+
+export function logFood(input: Omit<FoodLog, 'id'>) {
+  const id = uuid();
+  useApp.getState().logFood({ ...input, id });
+  const uid = userId();
+  if (!uid) return;
+  supabase
+    .from('food_logs')
+    .insert({
+      id,
+      user_id: uid,
+      local_date: input.date,
+      meal: input.meal,
+      custom_name: input.name.slice(0, 120),
+      servings: input.servings,
+      calories: input.calories,
+      protein_g: input.proteinG,
+      carbs_g: input.carbsG,
+      fat_g: input.fatG,
+      entry_method: input.entryMethod,
+    })
+    .then(warnOnError('food'));
+}
+
+export function deleteFood(id: string) {
+  useApp.getState().deleteFood(id);
+  if (!userId()) return;
+  supabase.from('food_logs').delete().eq('id', id).then(warnOnError('food delete'));
 }

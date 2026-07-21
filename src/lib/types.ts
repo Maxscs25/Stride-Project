@@ -76,6 +76,40 @@ export interface PersonalRecord {
   date: string;
 }
 
+export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface FoodLog {
+  id: string;
+  date: string;
+  meal: Meal;
+  name: string;
+  servings: number;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  entryMethod: 'barcode' | 'search' | 'manual' | 'quick_add';
+}
+
+/** A resolved food (from Open Food Facts, search, or manual) before logging. */
+export interface FoodItem {
+  name: string;
+  brand?: string;
+  servingDesc?: string;
+  barcode?: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+export const MEAL_META: Record<Meal, { label: string; icon: string }> = {
+  breakfast: { label: 'Breakfast', icon: 'sunny' },
+  lunch: { label: 'Lunch', icon: 'partly-sunny' },
+  dinner: { label: 'Dinner', icon: 'moon' },
+  snack: { label: 'Snack', icon: 'nutrition' },
+};
+
 export interface Profile {
   name: string;
   weeklyGoalMi: number;

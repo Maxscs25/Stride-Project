@@ -41,6 +41,12 @@
           "NSHealthUpdateUsageDescription": false,
           "background": false
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Stride uses the camera to scan food barcodes for quick nutrition logging."
+        }
       ]
     ],
     "experiments": {
