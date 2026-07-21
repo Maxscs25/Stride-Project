@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { DatePicker } from '@/components/DatePicker';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
-import { addDays, fmtPace, todayKey } from '@/lib/format';
+import { addDays, fmtLongDate, fmtPace, todayKey } from '@/lib/format';
 import { shoeMiles } from '@/lib/load';
 import { logRun } from '@/lib/sync';
 import { WORKOUT_META, type WorkoutType } from '@/lib/types';
@@ -17,7 +18,8 @@ export default function LogRun() {
   const shoes = useApp((s) => s.shoes);
   const runs = useApp((s) => s.runs);
 
-  const [dayOffset, setDayOffset] = useState(0);
+  const [date, setDate] = useState(todayKey());
+  const [showCal, setShowCal] = useState(false);
   const [distance, setDistance] = useState('');
   const [minutes, setMinutes] = useState('');
   const [type, setType] = useState<WorkoutType>('easy');
@@ -35,7 +37,7 @@ export default function LogRun() {
   const save = () => {
     if (!valid) return;
     logRun({
-      date: addDays(todayKey(), dayOffset),
+      date,
       distanceMi: mi,
       durationS,
       type,
@@ -46,13 +48,45 @@ export default function LogRun() {
     finishLogging();
   };
 
+  const yesterday = addDays(todayKey(), -1);
+
   return (
     <ModalShell title="Log a Run">
       <Label text="When" />
-      <View style={{ flexDirection: 'row', marginBottom: 8 }}>
-        <Chip label="Today" selected={dayOffset === 0} onPress={() => setDayOffset(0)} />
-        <Chip label="Yesterday" selected={dayOffset === -1} onPress={() => setDayOffset(-1)} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
+        <Chip
+          label="Today"
+          selected={date === todayKey() && !showCal}
+          onPress={() => {
+            setDate(todayKey());
+            setShowCal(false);
+          }}
+        />
+        <Chip
+          label="Yesterday"
+          selected={date === yesterday && !showCal}
+          onPress={() => {
+            setDate(yesterday);
+            setShowCal(false);
+          }}
+        />
+        <Chip
+          label={
+            date !== todayKey() && date !== yesterday ? fmtLongDate(date).replace(/^\w+, /, '') : 'Pick a date'
+          }
+          selected={showCal || (date !== todayKey() && date !== yesterday)}
+          onPress={() => setShowCal((v) => !v)}
+        />
       </View>
+      {showCal ? (
+        <DatePicker
+          value={date}
+          onChange={(k) => {
+            setDate(k);
+            setShowCal(false);
+          }}
+        />
+      ) : null}
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
