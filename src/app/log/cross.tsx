@@ -81,6 +81,7 @@ export default function LogCross() {
         placeholder="What did you do?"
         multiline
         numberOfLines={3}
+        maxLength={2000}
         style={{ minHeight: 80, textAlignVertical: 'top' }}
       />
 

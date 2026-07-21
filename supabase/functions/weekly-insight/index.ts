@@ -72,6 +72,26 @@ Deno.serve(async (req) => {
   if (userErr || !userRes.user) return json({ error: 'Unauthorized' }, 401);
   const uid = userRes.user.id;
 
+  // Rate limit: this endpoint calls Claude (real cost). Cap per user so a
+  // stuck client or abusive caller can't run up the bill. Uses the service
+  // role because the counter table is not client-accessible.
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+  const { data: allowed } = await admin.rpc('check_rate_limit', {
+    p_user: uid,
+    p_action: 'weekly_insight',
+    p_max: 10, // 10 generations
+    p_window_seconds: 3600, // per hour
+  });
+  if (allowed === false) {
+    return json(
+      { error: "You've generated a lot of insights recently — try again in a little while." },
+      429
+    );
+  }
+
   // Layers 1 + 2 on demand, so the insight reflects today's training
   await supabase.rpc('refresh_training_load', { p_user: uid });
   await supabase.rpc('detect_signals', { p_user: uid });

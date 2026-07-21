@@ -171,6 +171,9 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== 'POST') return json({ error: 'not found' }, 404);
+  if (Number(req.headers.get('content-length') ?? 0) > 200_000) {
+    return json({ error: 'payload too large' }, 413);
+  }
 
   const raw = await req.text();
   const signature = req.headers.get('terra-signature');
@@ -210,6 +213,18 @@ Deno.serve(async (req) => {
   const { data: userRes } = await userClient.auth.getUser();
   if (!userRes?.user) return json({ error: 'Unauthorized' }, 401);
   const uid = userRes.user.id;
+
+  if (body.action !== 'start' && body.action !== 'disconnect') {
+    return json({ error: 'unknown action' }, 400);
+  }
+
+  const { data: ok } = await admin.rpc('check_rate_limit', {
+    p_user: uid,
+    p_action: 'oauth_start',
+    p_max: 15,
+    p_window_seconds: 3600,
+  });
+  if (ok === false) return json({ error: 'Too many attempts — try again shortly.' }, 429);
 
   if (body.action === 'start') {
     const res = await fetch(`${TERRA_API}/auth/generateWidgetSession`, {

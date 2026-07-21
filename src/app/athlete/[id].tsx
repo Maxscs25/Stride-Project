@@ -160,6 +160,7 @@ export default function AthleteView() {
           onChangeText={setDraft}
           placeholder="Nice week — let's keep Sunday easy."
           multiline
+          maxLength={2000}
         />
         <Pressable
           onPress={send}

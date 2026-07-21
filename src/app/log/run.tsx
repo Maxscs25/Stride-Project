@@ -125,6 +125,7 @@ export default function LogRun() {
         placeholder="How did it feel? Any niggles?"
         multiline
         numberOfLines={3}
+        maxLength={4000}
         style={{ minHeight: 80, textAlignVertical: 'top' }}
       />
 

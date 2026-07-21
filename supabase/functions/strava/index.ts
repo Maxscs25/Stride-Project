@@ -227,6 +227,9 @@ Deno.serve(async (req) => {
 
   // ---- POSTs: app actions + webhook events ----
   if (req.method === 'POST') {
+    if (Number(req.headers.get('content-length') ?? 0) > 100_000) {
+      return json({ error: 'payload too large' }, 413);
+    }
     let body: Record<string, unknown> = {};
     try {
       body = await req.json();
@@ -243,6 +246,13 @@ Deno.serve(async (req) => {
       });
       const { data: userRes } = await userClient.auth.getUser();
       if (!userRes?.user) return json({ error: 'Unauthorized' }, 401);
+      const { data: ok } = await admin.rpc('check_rate_limit', {
+        p_user: userRes.user.id,
+        p_action: 'oauth_start',
+        p_max: 15,
+        p_window_seconds: 3600,
+      });
+      if (ok === false) return json({ error: 'Too many attempts — try again shortly.' }, 429);
       const { data: st, error } = await admin
         .from('oauth_states')
         .insert({ user_id: userRes.user.id })

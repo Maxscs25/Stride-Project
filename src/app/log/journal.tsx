@@ -70,6 +70,7 @@ export default function LogJournal() {
         placeholder="Any niggles, soreness, or wins? e.g. 'calf a bit tight after the long run'"
         multiline
         numberOfLines={4}
+        maxLength={4000}
         style={{ minHeight: 100, textAlignVertical: 'top' }}
       />
 
