@@ -131,6 +131,21 @@ export default function FormList() {
         </Card>
       ) : null}
 
+      {analyses.filter((a) => a.status === 'complete' && !a.sample).length >= 2 ? (
+        <Card
+          onPress={() => router.push('/form/trends')}
+          style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="trending-up" size={20} color={colors.accent} style={{ marginRight: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>Form trends</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+              See how your cadence, posture & bounce change over time.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Card>
+      ) : null}
+
       <SectionHeader title="Your Analyses" />
       {loaded && analyses.length === 0 ? (
         <Card>

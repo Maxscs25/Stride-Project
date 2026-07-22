@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
@@ -51,7 +51,21 @@ function Recorder() {
   const [permission, requestPermission] = useCameraPermissions();
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const camRef = useRef<any>(null);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (recording) {
+      setElapsed(0);
+      timer.current = setInterval(() => setElapsed((e) => e + 1), 1000);
+    } else if (timer.current) {
+      clearInterval(timer.current);
+    }
+    return () => {
+      if (timer.current) clearInterval(timer.current);
+    };
+  }, [recording]);
 
   if (!permission?.granted) {
     return (
@@ -95,14 +109,43 @@ function Recorder() {
     }
   };
 
+  const tooShort = recording && elapsed < 8;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <CameraView ref={camRef} style={{ flex: 1 }} mode="video" facing="back" />
-      <View style={{ position: 'absolute', top: 60, left: 0, right: 0, alignItems: 'center' }}>
-        <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
-          Side-on · whole body in frame
+
+      {/* Framing guide: keep head below the top line, feet above the bottom */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+        <View style={{ position: 'absolute', top: '14%', left: '8%', right: '8%', borderTopWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)', borderStyle: 'dashed' }} />
+        <View style={{ position: 'absolute', bottom: '14%', left: '8%', right: '8%', borderTopWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)', borderStyle: 'dashed' }} />
+        <View style={{ position: 'absolute', top: '14%', bottom: '14%', left: '8%', width: 1.5, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+        <View style={{ position: 'absolute', top: '14%', bottom: '14%', right: '8%', width: 1.5, backgroundColor: 'rgba(255,255,255,0.25)' }} />
+        <Text style={{ position: 'absolute', top: '14%', alignSelf: 'center', marginTop: 4, color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700' }}>
+          head below
+        </Text>
+        <Text style={{ position: 'absolute', bottom: '14%', alignSelf: 'center', marginBottom: 4, color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700' }}>
+          feet above
         </Text>
       </View>
+
+      {/* Top: guidance or live timer */}
+      <View style={{ position: 'absolute', top: 56, left: 0, right: 0, alignItems: 'center' }}>
+        {recording ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 }}>
+            <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: '#EF4444', marginRight: 7 }} />
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800' }}>0:{String(elapsed).padStart(2, '0')}</Text>
+          </View>
+        ) : (
+          <View style={{ backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Film side-on</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 }}>
+              Whole body in frame · good light · 10–15s
+            </Text>
+          </View>
+        )}
+      </View>
+
       <View style={{ position: 'absolute', bottom: 50, left: 0, right: 0, alignItems: 'center' }}>
         <Pressable
           onPress={toggle}
@@ -126,7 +169,13 @@ function Recorder() {
           />
         </Pressable>
         <Text style={{ color: '#fff', marginTop: 10, fontWeight: '600' }}>
-          {processing ? 'Processing…' : recording ? 'Recording — tap to stop' : 'Tap to record'}
+          {processing
+            ? 'Analyzing…'
+            : tooShort
+              ? `Keep going — ${8 - elapsed}s more`
+              : recording
+                ? 'Tap to stop'
+                : 'Tap to record'}
         </Text>
       </View>
       <Pressable

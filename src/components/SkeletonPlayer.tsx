@@ -1,15 +1,106 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, Text, View } from 'react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
 
 import { SKELETON_BONES } from '@/lib/gait';
 import { useTheme } from '@/theme';
 
+interface Pt {
+  x: number;
+  y: number;
+  present: boolean;
+}
+
 /**
- * Animated playback of the detected pose. Draws the COCO-17 skeleton per frame
- * from packed [x,y,score] keypoints (normalized, y-down) and advances on a
- * timer, with play/pause and a scrubber. Pure SVG — no video needed.
+ * Clean up raw pose for stable playback, per joint:
+ *  1) linearly fill low-confidence gaps between detections (no pop-out),
+ *  2) centered moving average to kill jitter WITHOUT the phase lag an EMA adds,
+ *  3) a joint detected anywhere is shown for the whole clip, so nothing flickers.
+ */
+function smoothFrames(frames: number[][][]): Pt[][] {
+  const J = 17;
+  const N = frames.length;
+  const R = 2; // centered window radius
+  const out: Pt[][] = Array.from({ length: N }, () => new Array(J));
+
+  for (let j = 0; j < J; j++) {
+    const xs = new Array<number>(N);
+    const ys = new Array<number>(N);
+    const seen = new Array<boolean>(N).fill(false);
+    for (let n = 0; n < N; n++) {
+      const p = frames[n]?.[j];
+      if (p && p[2] >= 0.2) {
+        xs[n] = p[0];
+        ys[n] = p[1];
+        seen[n] = true;
+      }
+    }
+    const first = seen.indexOf(true);
+    const anyPresent = first !== -1;
+
+    if (anyPresent) {
+      const last = seen.lastIndexOf(true);
+      for (let n = 0; n < first; n++) ((xs[n] = xs[first]), (ys[n] = ys[first]));
+      for (let n = last + 1; n < N; n++) ((xs[n] = xs[last]), (ys[n] = ys[last]));
+      let prev = first;
+      let n = first + 1;
+      while (n <= last) {
+        if (seen[n]) {
+          prev = n;
+          n++;
+          continue;
+        }
+        let m = n;
+        while (m <= last && !seen[m]) m++;
+        for (let k = n; k < m; k++) {
+          const t = (k - prev) / (m - prev);
+          xs[k] = xs[prev] + (xs[m] - xs[prev]) * t;
+          ys[k] = ys[prev] + (ys[m] - ys[prev]) * t;
+        }
+        n = m;
+      }
+    }
+
+    for (let n = 0; n < N; n++) {
+      if (!anyPresent) {
+        out[n][j] = { x: 0, y: 0, present: false };
+        continue;
+      }
+      let sx = 0;
+      let sy = 0;
+      let c = 0;
+      for (let k = -R; k <= R; k++) {
+        const idx = n + k;
+        if (idx >= 0 && idx < N) {
+          sx += xs[idx];
+          sy += ys[idx];
+          c++;
+        }
+      }
+      out[n][j] = { x: sx / c, y: sy / c, present: true };
+    }
+  }
+  return out;
+}
+
+function interpolate(sm: Pt[][], f: number): Pt[] {
+  const a = Math.floor(f);
+  const b = Math.min(a + 1, sm.length - 1);
+  const t = f - a;
+  return sm[a].map((pa, j) => {
+    const pb = sm[b][j];
+    if (pa.present && pb.present) {
+      return { x: pa.x + (pb.x - pa.x) * t, y: pa.y + (pb.y - pa.y) * t, present: true };
+    }
+    return pa.present ? pa : pb;
+  });
+}
+
+/**
+ * Smooth animated playback of the detected pose. Renders at ~30fps by
+ * interpolating between smoothed keyframes on a requestAnimationFrame clock,
+ * so it stays fluid regardless of the stored keyframe rate.
  */
 export function SkeletonPlayer({
   frames,
@@ -22,25 +113,39 @@ export function SkeletonPlayer({
 }) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
-  const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const raf = useRef<ReturnType<typeof setInterval> | null>(null);
+  const smoothed = useMemo(() => smoothFrames(frames), [frames]);
+  const [pose, setPose] = useState<Pt[]>(() => smoothed[0] ?? []);
+  const [progress, setProgress] = useState(0);
+
+  const startRef = useRef(0);
+  const lastRenderRef = useRef(0);
 
   useEffect(() => {
-    if (!playing || frames.length < 2) return;
-    raf.current = setInterval(
-      () => setIdx((i) => (i + 1) % frames.length),
-      1000 / Math.min(Math.max(fps, 8), 20)
-    );
-    return () => {
-      if (raf.current) clearInterval(raf.current);
+    if (!playing || smoothed.length < 2) return;
+    const keyFps = Math.min(Math.max(fps, 8), 15);
+    const total = smoothed.length;
+    const durationMs = (total / keyFps) * 1000;
+    let raf = 0;
+    startRef.current = 0;
+
+    const loop = (now: number) => {
+      if (!startRef.current) startRef.current = now;
+      const tMs = (now - startRef.current) % durationMs;
+      const f = (tMs / durationMs) * (total - 1);
+      if (now - lastRenderRef.current > 33) {
+        // ~30fps render cadence
+        setPose(interpolate(smoothed, f));
+        setProgress(f / (total - 1));
+        lastRenderRef.current = now;
+      }
+      raf = requestAnimationFrame(loop);
     };
-  }, [playing, frames.length, fps]);
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, smoothed, fps]);
 
   const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
-  const frame = frames[idx] ?? frames[0];
-
-  // Fit the normalized points to the view with a little padding.
   const px = (x: number) => 16 + x * (width - 32);
   const py = (y: number) => 12 + y * (height - 24);
 
@@ -48,35 +153,28 @@ export function SkeletonPlayer({
     <View>
       <View
         onLayout={onLayout}
-        style={{
-          height,
-          borderRadius: 14,
-          backgroundColor: colors.surfaceAlt,
-          overflow: 'hidden',
-        }}>
-        {width > 0 && frame ? (
+        style={{ height, borderRadius: 14, backgroundColor: colors.surfaceAlt, overflow: 'hidden' }}>
+        {width > 0 && pose.length ? (
           <Svg width={width} height={height}>
             {SKELETON_BONES.map(([a, b], i) => {
-              const pa = frame[a];
-              const pb = frame[b];
-              if (!pa || !pb || pa[2] < 0.2 || pb[2] < 0.2) return null;
+              const pa = pose[a];
+              const pb = pose[b];
+              if (!pa?.present || !pb?.present) return null;
               return (
                 <Line
                   key={i}
-                  x1={px(pa[0])}
-                  y1={py(pa[1])}
-                  x2={px(pb[0])}
-                  y2={py(pb[1])}
+                  x1={px(pa.x)}
+                  y1={py(pa.y)}
+                  x2={px(pb.x)}
+                  y2={py(pb.y)}
                   stroke={colors.accent}
                   strokeWidth={3}
                   strokeLinecap="round"
                 />
               );
             })}
-            {frame.map((p, i) =>
-              p[2] < 0.2 ? null : (
-                <Circle key={i} cx={px(p[0])} cy={py(p[1])} r={4} fill={colors.text} />
-              )
+            {pose.map((p, i) =>
+              p.present ? <Circle key={i} cx={px(p.x)} cy={py(p.y)} r={4} fill={colors.text} /> : null
             )}
           </Svg>
         ) : null}
@@ -96,21 +194,16 @@ export function SkeletonPlayer({
           }}>
           <Ionicons name={playing ? 'pause' : 'play'} size={18} color={colors.onAccent} />
         </Pressable>
-        <View style={{ flex: 1 }}>
-          <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border }}>
-            <View
-              style={{
-                height: 6,
-                borderRadius: 3,
-                width: `${((idx + 1) / frames.length) * 100}%`,
-                backgroundColor: colors.accent,
-              }}
-            />
-          </View>
+        <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.border }}>
+          <View
+            style={{
+              height: 6,
+              borderRadius: 3,
+              width: `${Math.round(progress * 100)}%`,
+              backgroundColor: colors.accent,
+            }}
+          />
         </View>
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginLeft: 10, fontWeight: '600' }}>
-          {(idx / Math.min(Math.max(fps, 8), 20)).toFixed(1)}s
-        </Text>
       </View>
     </View>
   );
