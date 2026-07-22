@@ -64,6 +64,69 @@ const stdev = (xs: number[]) => {
   return Math.sqrt(avg(xs.map((x) => (x - m) ** 2)));
 };
 
+/** Centered moving average. */
+function movingAvg(ys: number[], win: number): number[] {
+  const half = Math.max(1, Math.floor(win / 2));
+  return ys.map((_, i) => {
+    let s = 0;
+    let c = 0;
+    for (let k = -half; k <= half; k++) {
+      const j = i + k;
+      if (j >= 0 && j < ys.length) {
+        s += ys[j];
+        c++;
+      }
+    }
+    return s / c;
+  });
+}
+
+/**
+ * Remove drift slower than ~win frames, isolating per-stride oscillation.
+ * Essential for over-ground video where the runner translates through the
+ * frame — without it, that drift swamps the actual bounce/step motion.
+ */
+function detrend(ys: number[], win: number): number[] {
+  const ma = movingAvg(ys, win);
+  return ys.map((y, i) => y - ma[i]);
+}
+
+/** Robust peak-to-peak amplitude (p95 − p5), resistant to single-frame spikes. */
+function peakToPeak(ys: number[]): number {
+  if (ys.length < 3) return 0;
+  const sorted = [...ys].sort((a, b) => a - b);
+  const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+  return at(0.95) - at(0.05);
+}
+
+/**
+ * Dominant oscillation period (seconds) of a signal via autocorrelation,
+ * searched within [minP, maxP]. Far more robust for cadence than counting
+ * threshold crossings, especially on over-ground video.
+ */
+function dominantPeriod(ys: number[], fps: number, minP: number, maxP: number): number | null {
+  const n = ys.length;
+  const minLag = Math.max(2, Math.floor(minP * fps));
+  const maxLag = Math.min(n - 2, Math.ceil(maxP * fps));
+  if (maxLag <= minLag) return null;
+  let bestLag = -1;
+  let best = 0;
+  let norm = 0;
+  for (let i = 0; i < n; i++) norm += ys[i] * ys[i];
+  if (norm <= 0) return null;
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let s = 0;
+    for (let i = 0; i + lag < n; i++) s += ys[i] * ys[i + lag];
+    if (s > best) {
+      best = s;
+      bestLag = lag;
+    }
+  }
+  // Require a real periodic peak, not just noise.
+  if (bestLag < 0 || best / norm < 0.15) return null;
+  return bestLag / fps;
+}
+
 /**
  * Count ground contacts for one foot by counting oscillation cycles. y grows
  * downward, so a foot is planted at max y. We count each time the ankle rises
@@ -120,10 +183,24 @@ export function computeCadence(s: PoseSeries): Metric {
   if (durationS < 2 || conf < 0.3) {
     return metricUnknown('cadence', 'Cadence', 'spm', 'Not enough clear footage to measure.');
   }
-  const leftYs = s.frames.map((f) => f[KP.leftAnkle].y);
-  const rightYs = s.frames.map((f) => f[KP.rightAnkle].y);
-  const steps = contactCount(leftYs) + contactCount(rightYs);
-  const spm = Math.round((steps / durationS) * 60);
+  // Each ankle oscillates once per STRIDE — a strong, clean autocorrelation
+  // peak even on over-ground video. Cadence = 2 steps per stride. (The hip's
+  // step-frequency peak is unreliable because left/right asymmetry makes the
+  // stride-frequency component dominate.) Fall back to contact counting.
+  const win = Math.max(3, Math.round(s.fps * 1.2));
+  const leftYs = detrend(s.frames.map((f) => f[KP.leftAnkle].y), win);
+  const rightYs = detrend(s.frames.map((f) => f[KP.rightAnkle].y), win);
+  const strideRange: [number, number] = [0.5, 0.95]; // cadence 126–240 spm
+  const periods = [
+    dominantPeriod(leftYs, s.fps, ...strideRange),
+    dominantPeriod(rightYs, s.fps, ...strideRange),
+  ].filter((p): p is number => p != null);
+  let spm: number;
+  if (periods.length) {
+    spm = Math.round(120 / avg(periods));
+  } else {
+    spm = Math.round(((contactCount(leftYs) + contactCount(rightYs)) / durationS) * 60);
+  }
   return {
     key: 'cadence',
     label: 'Cadence',
@@ -175,9 +252,14 @@ export function computeVerticalOscillation(s: PoseSeries): Metric {
   if (conf < 0.3 || perCm <= 0) {
     return metricUnknown('vertical_osc', 'Vertical oscillation', 'cm', 'Hips not clearly tracked.');
   }
-  const hipYs = s.frames.map((f) => mid(f[KP.leftHip], f[KP.rightHip]).y);
-  const range = Math.max(...hipYs) - Math.min(...hipYs);
-  const cm = Math.round((range / perCm) * 10) / 10;
+  // Per-stride bounce = detrended hip amplitude, not the whole-clip range
+  // (which would include the runner drifting through the frame).
+  const win = Math.max(3, Math.round(s.fps * 1.2));
+  const hipYs = detrend(
+    s.frames.map((f) => mid(f[KP.leftHip], f[KP.rightHip]).y),
+    win
+  );
+  const cm = Math.round((peakToPeak(hipYs) / perCm) * 10) / 10;
   return {
     key: 'vertical_osc',
     label: 'Vertical oscillation',
@@ -230,13 +312,12 @@ export function computeArmCarriage(s: PoseSeries): Metric {
 export function computeSymmetry(s: PoseSeries): Metric {
   const conf = seriesConfidence(s.frames, [KP.leftAnkle, KP.rightAnkle]);
   if (conf < 0.3) return metricUnknown('symmetry', 'L/R symmetry', '%', 'Both legs not clearly tracked.');
-  const lAmp =
-    Math.max(...s.frames.map((f) => f[KP.leftAnkle].y)) -
-    Math.min(...s.frames.map((f) => f[KP.leftAnkle].y));
-  const rAmp =
-    Math.max(...s.frames.map((f) => f[KP.rightAnkle].y)) -
-    Math.min(...s.frames.map((f) => f[KP.rightAnkle].y));
-  const sym = Math.round((Math.min(lAmp, rAmp) / Math.max(lAmp, rAmp)) * 100);
+  // Detrended per-stride amplitude, not whole-clip range (which drift inflates).
+  const win = Math.max(3, Math.round(s.fps * 1.2));
+  const lAmp = peakToPeak(detrend(s.frames.map((f) => f[KP.leftAnkle].y), win));
+  const rAmp = peakToPeak(detrend(s.frames.map((f) => f[KP.rightAnkle].y), win));
+  const sym =
+    Math.max(lAmp, rAmp) > 0 ? Math.round((Math.min(lAmp, rAmp) / Math.max(lAmp, rAmp)) * 100) : 100;
   return {
     key: 'symmetry',
     label: 'L/R symmetry',
