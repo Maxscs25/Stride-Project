@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
-import { SkeletonPlayer } from '@/components/SkeletonPlayer';
+import { SkeletonPlayer, VideoOverlay } from '@/components/SkeletonPlayer';
 import { Card, SectionHeader } from '@/components/ui';
-import { fetchKeypoints, useForm } from '@/lib/form';
+import { fetchKeypoints, getVideoSource, useForm, type Keypoints } from '@/lib/form';
 import type { Rating } from '@/lib/gait';
 import { radius, useTheme } from '@/theme';
 
@@ -15,11 +15,18 @@ export default function FormResult() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const analysis = useForm((s) => s.analyses.find((a) => a.id === id));
   const analyses = useForm((s) => s.analyses);
-  const [keypoints, setKeypoints] = useState<{ frames: number[][][]; fps: number } | null>(null);
+  const [keypoints, setKeypoints] = useState<Keypoints | null>(null);
+  const [videoSource, setVideoSource] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id && analysis?.status === 'complete') fetchKeypoints(id).then(setKeypoints);
+    if (id && analysis?.status === 'complete') {
+      fetchKeypoints(id).then(setKeypoints);
+      getVideoSource(id).then(setVideoSource);
+    }
   }, [id, analysis?.status]);
+
+  const aspect =
+    keypoints?.width && keypoints?.height ? keypoints.width / keypoints.height : 0.5625;
 
   const ratingColor = (r: Rating) =>
     r === 'good' ? colors.good : r === 'fair' ? colors.info : r === 'watch' ? colors.warn : colors.textMuted;
@@ -92,9 +99,20 @@ export default function FormResult() {
         <>
           <SectionHeader title="Motion" />
           <Card>
-            <SkeletonPlayer frames={keypoints.frames} fps={keypoints.fps} />
+            {videoSource ? (
+              <VideoOverlay
+                source={videoSource}
+                frames={keypoints.frames}
+                duration={keypoints.duration}
+                aspect={aspect}
+              />
+            ) : (
+              <SkeletonPlayer frames={keypoints.frames} duration={keypoints.duration} />
+            )}
             <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 10 }}>
-              The pose Stride detected, frame by frame — what the metrics are measured from.
+              {videoSource
+                ? 'Your run with the detected pose overlaid — tap the skeleton toggle to compare.'
+                : 'The pose Stride detected, frame by frame — what the metrics are measured from.'}
             </Text>
           </Card>
         </>

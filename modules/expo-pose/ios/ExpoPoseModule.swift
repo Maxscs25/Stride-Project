@@ -34,6 +34,18 @@ public class ExpoPoseModule: Module {
       throw Exception(name: "ExpoPose", description: "Clip too short to analyze")
     }
 
+    // Upright display dimensions, so the overlay can map normalized keypoints
+    // onto the displayed video frame exactly.
+    var displayW = 0.0
+    var displayH = 0.0
+    if let track = try await asset.loadTracks(withMediaType: .video).first {
+      let natural = try await track.load(.naturalSize)
+      let transform = try await track.load(.preferredTransform)
+      let sized = natural.applying(transform)
+      displayW = abs(Double(sized.width))
+      displayH = abs(Double(sized.height))
+    }
+
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
     generator.requestedTimeToleranceBefore = .zero
@@ -70,6 +82,12 @@ public class ExpoPoseModule: Module {
       count += 1
     }
 
-    return ["frames": frames, "fps": targetFps]
+    return [
+      "frames": frames,
+      "fps": targetFps,
+      "duration": durationSeconds,
+      "width": displayW,
+      "height": displayH,
+    ]
   }
 }

@@ -55,7 +55,8 @@
         {
           "photosPermission": "Stride lets you pick a running clip from your library to analyze your form."
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

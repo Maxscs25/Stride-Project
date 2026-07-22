@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import { create } from 'zustand';
 
 import { extractPose, isPoseAvailable } from '../../modules/expo-pose';
@@ -11,6 +12,13 @@ import {
   type Metric,
 } from './gait';
 import { supabase } from './supabase';
+
+export interface Keypoints {
+  frames: number[][][];
+  duration: number;
+  width?: number;
+  height?: number;
+}
 
 /**
  * Running-form analysis data layer. The pipeline is:
@@ -44,7 +52,10 @@ export const useForm = create<{
   loaded: boolean;
   busy: boolean;
   error: string | null;
-}>(() => ({ analyses: [], loaded: false, busy: false, error: null }));
+  /** In-memory local video URIs by analysis id — instant overlay right after
+   *  capture, before/without the storage upload. Not persisted. */
+  localVideos: Record<string, string>;
+}>(() => ({ analyses: [], loaded: false, busy: false, error: null, localVideos: {} }));
 
 interface Row {
   id: string;
@@ -89,7 +100,16 @@ async function currentUid(): Promise<string | null> {
 /** Store metrics + keypoints on a new row, then have Claude narrate the report. */
 async function analyzeMetrics(
   metrics: Metric[],
-  opts: { view: 'side' | 'rear'; sample: boolean; frames?: Frame[]; fps?: number; videoPath?: string }
+  opts: {
+    view: 'side' | 'rear';
+    sample: boolean;
+    frames?: Frame[];
+    fps?: number;
+    duration?: number;
+    width?: number;
+    height?: number;
+    videoUri?: string;
+  }
 ): Promise<string | null> {
   const uid = await currentUid();
   if (!uid) {
@@ -97,21 +117,30 @@ async function analyzeMetrics(
     return null;
   }
   const id = uuid();
-  const keypoints = opts.frames
-    ? { frames: packFrames(opts.frames), fps: Math.min(opts.fps ?? 15, 15) }
+  const keypoints: Keypoints | null = opts.frames
+    ? {
+        frames: packFrames(opts.frames),
+        duration: opts.duration ?? opts.frames.length / (opts.fps ?? 15),
+        width: opts.width,
+        height: opts.height,
+      }
     : null;
   const { error: insErr } = await supabase.from('form_analyses').insert({
     id,
     user_id: uid,
     view_angle: opts.view,
     status: 'processing',
-    video_path: opts.videoPath ?? null,
     metrics: { metrics, confidence: overallConfidence(metrics), sample: opts.sample },
     keypoints,
   });
   if (insErr) {
     useForm.setState({ error: insErr.message });
     return null;
+  }
+  // Overlay works instantly from the local file; upload for later in background.
+  if (opts.videoUri) {
+    useForm.setState((s) => ({ localVideos: { ...s.localVideos, [id]: opts.videoUri! } }));
+    uploadVideo(uid, id, opts.videoUri).catch((e) => console.warn('video upload failed', e));
   }
   await fetchAnalyses();
   const { data, error } = await supabase.functions.invoke('form-analysis', {
@@ -122,6 +151,38 @@ async function analyzeMetrics(
   }
   await fetchAnalyses();
   return id;
+}
+
+/** Best-effort upload of the clip to private storage (streamed, memory-safe). */
+async function uploadVideo(uid: string, id: string, uri: string) {
+  const path = `${uid}/${id}.mp4`;
+  const { data, error } = await supabase.storage.from('form-videos').createSignedUploadUrl(path);
+  if (error || !data) return;
+  const res = await FileSystem.uploadAsync(data.signedUrl, uri, {
+    httpMethod: 'PUT',
+    uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    headers: { 'content-type': 'video/mp4', 'x-upsert': 'true' },
+  });
+  if (res.status >= 200 && res.status < 300) {
+    await supabase.from('form_analyses').update({ video_path: path }).eq('id', id);
+  }
+}
+
+/** A playable video source for an analysis: the in-memory local file if we
+ *  just captured it, else a signed URL from storage. */
+export async function getVideoSource(id: string): Promise<string | null> {
+  const local = useForm.getState().localVideos[id];
+  if (local) return local;
+  const { data: row } = await supabase
+    .from('form_analyses')
+    .select('video_path')
+    .eq('id', id)
+    .maybeSingle();
+  if (!row?.video_path) return null;
+  const { data } = await supabase.storage
+    .from('form-videos')
+    .createSignedUrl(row.video_path, 3600);
+  return data?.signedUrl ?? null;
 }
 
 /** Demonstrate the full pipeline with synthetic keypoints (clearly a sample). */
@@ -142,12 +203,16 @@ export async function runSampleAnalysis(): Promise<string | null> {
 }
 
 /** Lazily load the stored keypoints for one analysis (for skeleton playback). */
-export async function fetchKeypoints(
-  id: string
-): Promise<{ frames: number[][][]; fps: number } | null> {
+export async function fetchKeypoints(id: string): Promise<Keypoints | null> {
   const { data } = await supabase.from('form_analyses').select('keypoints').eq('id', id).maybeSingle();
-  const kp = data?.keypoints;
-  return kp?.frames?.length ? kp : null;
+  const kp = data?.keypoints as Keypoints | null;
+  if (!kp?.frames?.length) return null;
+  // Back-compat: older rows stored fps instead of duration.
+  if (kp.duration == null) {
+    const fps = (kp as unknown as { fps?: number }).fps ?? 12;
+    kp.duration = kp.frames.length / fps;
+  }
+  return kp;
 }
 
 /**
@@ -185,6 +250,10 @@ export async function analyzeVideo(videoUri: string): Promise<string | null> {
       sample: false,
       frames,
       fps: raw.fps,
+      duration: raw.duration,
+      width: raw.width,
+      height: raw.height,
+      videoUri,
     });
   } catch (e) {
     console.warn('analyzeVideo failed', e);

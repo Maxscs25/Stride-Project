@@ -16,6 +16,10 @@ export interface RawPose {
   /** frames[frameIndex][jointIndex 0..16] = [x, y, score], normalized, y-down. */
   frames: number[][][];
   fps: number;
+  duration: number;
+  /** Upright display dimensions of the source video, for overlay alignment. */
+  width: number;
+  height: number;
 }
 
 /** Extract a COCO-17 pose keypoint series from a recorded video (Apple Vision). */
