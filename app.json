@@ -45,7 +45,15 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Stride uses the camera to scan food barcodes for quick nutrition logging."
+          "cameraPermission": "Stride uses the camera to record your running form and scan food barcodes.",
+          "microphonePermission": "Stride records audio as part of running-form video clips.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Stride lets you pick a running clip from your library to analyze your form."
         }
       ]
     ],

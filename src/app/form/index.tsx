@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { Link, router } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -6,9 +7,56 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { ModalShell } from '@/components/ModalShell';
 import { Card, Pill, SectionHeader } from '@/components/ui';
 import { fmtDate } from '@/lib/format';
-import { clearForm, fetchAnalyses, runSampleAnalysis, useForm } from '@/lib/form';
+import { analyzeVideo, clearForm, fetchAnalyses, runSampleAnalysis, useForm } from '@/lib/form';
 import { useAuth } from '@/lib/sync';
 import { radius, useTheme } from '@/theme';
+
+function FormAction({
+  icon,
+  label,
+  onPress,
+  primary,
+  busy,
+}: {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  primary?: boolean;
+  busy?: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      style={{
+        flex: 1,
+        backgroundColor: primary ? colors.accent : colors.surfaceAlt,
+        borderWidth: primary ? 0 : 1,
+        borderColor: colors.border,
+        borderRadius: radius.md,
+        paddingVertical: 15,
+        alignItems: 'center',
+      }}>
+      {busy ? (
+        <ActivityIndicator color={colors.accent} />
+      ) : (
+        <>
+          <Ionicons name={icon as never} size={20} color={primary ? colors.onAccent : colors.accent} />
+          <Text
+            style={{
+              color: primary ? colors.onAccent : colors.text,
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 3,
+            }}>
+            {label}
+          </Text>
+        </>
+      )}
+    </Pressable>
+  );
+}
 
 export default function FormList() {
   const { colors } = useTheme();
@@ -19,6 +67,19 @@ export default function FormList() {
     if (session) fetchAnalyses();
     else clearForm();
   }, [session]);
+
+  const pickFromLibrary = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return;
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['videos'],
+      videoMaxDuration: 30,
+      quality: 1,
+    });
+    if (res.canceled || !res.assets?.[0]?.uri) return;
+    const id = await analyzeVideo(res.assets[0].uri);
+    if (id) router.push({ pathname: '/form/[id]', params: { id } });
+  };
 
   if (!session) {
     return (
@@ -46,46 +107,22 @@ export default function FormList() {
       </Text>
 
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
-        <Pressable
+        <FormAction
+          icon="videocam"
+          label="Record"
+          primary
           onPress={() => router.push('/form/capture')}
-          style={{
-            flex: 1,
-            backgroundColor: colors.accent,
-            borderRadius: radius.md,
-            paddingVertical: 15,
-            alignItems: 'center',
-          }}>
-          <Ionicons name="videocam" size={20} color={colors.onAccent} />
-          <Text style={{ color: colors.onAccent, fontSize: 13, fontWeight: '800', marginTop: 3 }}>
-            Record a run
-          </Text>
-        </Pressable>
-        <Pressable
+        />
+        <FormAction icon="images" label="Choose clip" onPress={pickFromLibrary} />
+        <FormAction
+          icon="sparkles"
+          label="Sample"
+          busy={busy}
           onPress={async () => {
             const id = await runSampleAnalysis();
             if (id) router.push({ pathname: '/form/[id]', params: { id } });
           }}
-          disabled={busy}
-          style={{
-            flex: 1,
-            backgroundColor: colors.surfaceAlt,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: radius.md,
-            paddingVertical: 15,
-            alignItems: 'center',
-          }}>
-          {busy ? (
-            <ActivityIndicator color={colors.accent} />
-          ) : (
-            <>
-              <Ionicons name="sparkles" size={20} color={colors.accent} />
-              <Text style={{ color: colors.text, fontSize: 13, fontWeight: '800', marginTop: 3 }}>
-                Try a sample
-              </Text>
-            </>
-          )}
-        </Pressable>
+        />
       </View>
 
       {error ? (
