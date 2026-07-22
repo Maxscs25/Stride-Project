@@ -1,3 +1,5 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
@@ -120,6 +122,31 @@ export default function Insights() {
         <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 10 }}>
           Run days, last 12 weeks
         </Text>
+      </Card>
+
+      <SectionHeader title="Running Form" />
+      <Card onPress={() => router.push('/form')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: colors.accent + '22',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+          }}>
+          <Ionicons name="body" size={20} color={colors.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
+            AI gait analysis
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
+            Record a clip for cadence, posture & bounce feedback with drills.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </Card>
 
       {patterns.length > 0 ? (

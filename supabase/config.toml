@@ -427,3 +427,8 @@ entrypoint = "./functions/terra/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/journal-extract/index.ts"
+
+[functions.form-analysis]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/form-analysis/index.ts"
