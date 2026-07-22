@@ -6,8 +6,9 @@ import { BarChart, Heatmap, LoadChart, SparkBars } from '@/components/charts';
 import { Card, Screen, SectionHeader } from '@/components/ui';
 import { addDays, fmtDate, parseKey, todayKey } from '@/lib/format';
 import { generateInsight, useInsights } from '@/lib/insights';
-import { buildInsight, loadSeries, weeklyMileSeries } from '@/lib/load';
+import { buildInsight, loadSeries, symptomMentions, weeklyMileSeries } from '@/lib/load';
 import { useAuth } from '@/lib/sync';
+import { bodyPartLabel, useSymptoms } from '@/lib/symptoms';
 import { useApp } from '@/store';
 import { useTheme } from '@/theme';
 
@@ -28,6 +29,24 @@ export default function Insights() {
   const { session } = useAuth();
   const { latest: remoteInsight, generating, error } = useInsights();
   const insight = remoteInsight ?? localInsight;
+
+  // Prefer AI-extracted symptom patterns; fall back to on-device keyword
+  // detection for demo mode / before the first extraction.
+  const aiPatterns = useSymptoms((s) => s.patterns);
+  const patterns = useMemo(() => {
+    if (aiPatterns.length) {
+      return aiPatterns.map((p) => ({
+        part: bodyPartLabel(p.bodyPart),
+        count: p.count,
+        type: p.lastType,
+        ai: true,
+      }));
+    }
+    const mentions = symptomMentions(journal, 21);
+    return Object.entries(mentions)
+      .map(([part, count]) => ({ part, count, type: 'tightness', ai: false }))
+      .sort((a, b) => b.count - a.count);
+  }, [aiPatterns, journal]);
 
   const dailyMiles = useMemo(() => {
     const m = new Map<string, number>();
@@ -102,6 +121,43 @@ export default function Insights() {
           Run days, last 12 weeks
         </Text>
       </Card>
+
+      {patterns.length > 0 ? (
+        <>
+          <SectionHeader title="Patterns Noticed" />
+          <Card>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10 }}>
+              {patterns[0].ai
+                ? 'From your journal notes, tagged by AI · last 21 days'
+                : 'Recurring mentions in your notes · last 21 days'}
+            </Text>
+            {patterns.slice(0, 4).map((p) => (
+              <View
+                key={p.part}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 7 }}>
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: p.count >= 3 ? colors.warn : colors.textMuted,
+                    marginRight: 10,
+                  }}
+                />
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', flex: 1, textTransform: 'capitalize' }}>
+                  {p.part} {p.type}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '700' }}>
+                  {p.count}×
+                </Text>
+              </View>
+            ))}
+            <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 8, lineHeight: 16 }}>
+              3+ mentions of the same area feed an injury-prevention signal to your coach.
+            </Text>
+          </Card>
+        </>
+      ) : null}
 
       <SectionHeader
         title="Weekly AI Report"

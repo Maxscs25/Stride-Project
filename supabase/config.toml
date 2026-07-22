@@ -422,3 +422,8 @@ entrypoint = "./functions/strava/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/terra/index.ts"
+
+[functions.journal-extract]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/journal-extract/index.ts"

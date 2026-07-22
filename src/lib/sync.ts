@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { round1, uuid } from './format';
 import { clearInsights, fetchLatestInsight } from './insights';
 import { checkStrava, clearStrava } from './strava';
+import { clearSymptoms, fetchSymptomPatterns } from './symptoms';
 import { checkTerra, clearTerra } from './terra';
 import { supabase } from './supabase';
 import type { CrossSession, FoodLog, JournalEntry, Profile, Run, Shoe } from './types';
@@ -43,6 +44,7 @@ export function startAuthSync() {
       clearInsights();
       clearStrava();
       clearTerra();
+      clearSymptoms();
       useApp.getState().resetDemo();
     }
   });
@@ -59,7 +61,12 @@ async function bootstrap(session: Session) {
       .from('profiles')
       .upsert({ id: uid, display_name: name }, { ignoreDuplicates: true });
     await pullAll(name);
-    await Promise.all([fetchLatestInsight(), checkStrava(), checkTerra()]);
+    await Promise.all([
+      fetchLatestInsight(),
+      checkStrava(),
+      checkTerra(),
+      fetchSymptomPatterns(),
+    ]);
   } catch (e) {
     console.warn('sync bootstrap failed', e);
   } finally {
@@ -205,11 +212,24 @@ export function logRun(input: Omit<Run, 'id'>) {
     })
     .then(warnOnError('run'));
   if (input.note) {
+    const note = input.note;
     supabase
       .from('journal_entries')
-      .insert({ id: jid, user_id: uid, local_date: input.date, run_id: id, body: input.note })
-      .then(warnOnError('run note'));
+      .insert({ id: jid, user_id: uid, local_date: input.date, run_id: id, body: note })
+      .then((r) => {
+        warnOnError('run note')(r);
+        if (!r.error) extractSymptoms(jid, note);
+      });
   }
+}
+
+/** Fire-and-forget Claude Haiku symptom extraction for a journal note. */
+function extractSymptoms(journalEntryId: string, note: string) {
+  supabase.functions
+    .invoke('journal-extract', { body: { journal_entry_id: journalEntryId, note } })
+    .then(({ error }) => {
+      if (error) console.warn('symptom extract failed:', error.message);
+    });
 }
 
 export function logCross(input: Omit<CrossSession, 'id'>) {
@@ -249,7 +269,10 @@ export function addJournal(input: Omit<JournalEntry, 'id'>) {
       sleep_hours: input.sleepHours ?? null,
       sleep_quality: input.sleepQuality ?? null,
     })
-    .then(warnOnError('journal'));
+    .then((r) => {
+      warnOnError('journal')(r);
+      if (!r.error && input.note) extractSymptoms(id, input.note);
+    });
 }
 
 export function addShoe(input: Omit<Shoe, 'id'>) {
