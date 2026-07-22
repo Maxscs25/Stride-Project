@@ -272,6 +272,39 @@ export function overallConfidence(metrics: Metric[]): number {
   return known.length ? avg(known.map((m) => m.confidence)) : 0;
 }
 
+/** Compact [x,y,score] triples, rounded, downsampled to <= maxFrames, for
+ *  storage + skeleton playback. */
+export function packFrames(frames: Frame[], maxFrames = 60): number[][][] {
+  const stride = Math.max(1, Math.ceil(frames.length / maxFrames));
+  const out: number[][][] = [];
+  for (let i = 0; i < frames.length; i += stride) {
+    out.push(
+      frames[i].map((p) => [
+        Math.round(p.x * 1000) / 1000,
+        Math.round(p.y * 1000) / 1000,
+        Math.round(p.score * 100) / 100,
+      ])
+    );
+  }
+  return out;
+}
+
+/** Bone connections (COCO-17 index pairs) for drawing the skeleton. */
+export const SKELETON_BONES: [number, number][] = [
+  [KP.leftShoulder, KP.rightShoulder],
+  [KP.leftShoulder, KP.leftElbow],
+  [KP.leftElbow, KP.leftWrist],
+  [KP.rightShoulder, KP.rightElbow],
+  [KP.rightElbow, KP.rightWrist],
+  [KP.leftShoulder, KP.leftHip],
+  [KP.rightShoulder, KP.rightHip],
+  [KP.leftHip, KP.rightHip],
+  [KP.leftHip, KP.leftKnee],
+  [KP.leftKnee, KP.leftAnkle],
+  [KP.rightHip, KP.rightKnee],
+  [KP.rightKnee, KP.rightAnkle],
+];
+
 /**
  * Synthetic side-view runner for demonstrating the pipeline end-to-end
  * (real metrics engine + real Claude report) before on-device pose inference

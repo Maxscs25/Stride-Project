@@ -2,7 +2,14 @@ import { create } from 'zustand';
 
 import { extractPose, isPoseAvailable } from '../../modules/expo-pose';
 import { uuid } from './format';
-import { computeMetrics, overallConfidence, sampleSeries, type Frame, type Metric } from './gait';
+import {
+  computeMetrics,
+  overallConfidence,
+  packFrames,
+  sampleSeries,
+  type Frame,
+  type Metric,
+} from './gait';
 import { supabase } from './supabase';
 
 /**
@@ -79,10 +86,10 @@ async function currentUid(): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
-/** Store metrics on a new row, then have Claude narrate the report. */
+/** Store metrics + keypoints on a new row, then have Claude narrate the report. */
 async function analyzeMetrics(
   metrics: Metric[],
-  opts: { view: 'side' | 'rear'; sample: boolean; videoPath?: string }
+  opts: { view: 'side' | 'rear'; sample: boolean; frames?: Frame[]; fps?: number; videoPath?: string }
 ): Promise<string | null> {
   const uid = await currentUid();
   if (!uid) {
@@ -90,6 +97,9 @@ async function analyzeMetrics(
     return null;
   }
   const id = uuid();
+  const keypoints = opts.frames
+    ? { frames: packFrames(opts.frames), fps: Math.min(opts.fps ?? 15, 15) }
+    : null;
   const { error: insErr } = await supabase.from('form_analyses').insert({
     id,
     user_id: uid,
@@ -97,6 +107,7 @@ async function analyzeMetrics(
     status: 'processing',
     video_path: opts.videoPath ?? null,
     metrics: { metrics, confidence: overallConfidence(metrics), sample: opts.sample },
+    keypoints,
   });
   if (insErr) {
     useForm.setState({ error: insErr.message });
@@ -117,11 +128,26 @@ async function analyzeMetrics(
 export async function runSampleAnalysis(): Promise<string | null> {
   useForm.setState({ busy: true, error: null });
   try {
-    const metrics = computeMetrics(sampleSeries());
-    return await analyzeMetrics(metrics, { view: 'side', sample: true });
+    const series = sampleSeries();
+    const metrics = computeMetrics(series);
+    return await analyzeMetrics(metrics, {
+      view: 'side',
+      sample: true,
+      frames: series.frames,
+      fps: series.fps,
+    });
   } finally {
     useForm.setState({ busy: false });
   }
+}
+
+/** Lazily load the stored keypoints for one analysis (for skeleton playback). */
+export async function fetchKeypoints(
+  id: string
+): Promise<{ frames: number[][][]; fps: number } | null> {
+  const { data } = await supabase.from('form_analyses').select('keypoints').eq('id', id).maybeSingle();
+  const kp = data?.keypoints;
+  return kp?.frames?.length ? kp : null;
 }
 
 /**
@@ -154,7 +180,12 @@ export async function analyzeVideo(videoUri: string): Promise<string | null> {
       return null;
     }
     const metrics = computeMetrics({ frames, fps: raw.fps, view: 'side' });
-    return await analyzeMetrics(metrics, { view: 'side', sample: false });
+    return await analyzeMetrics(metrics, {
+      view: 'side',
+      sample: false,
+      frames,
+      fps: raw.fps,
+    });
   } catch (e) {
     console.warn('analyzeVideo failed', e);
     useForm.setState({ error: 'Analysis failed — try filming again side-on in good light.' });

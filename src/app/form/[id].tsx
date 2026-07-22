@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
+import { SkeletonPlayer } from '@/components/SkeletonPlayer';
 import { Card, SectionHeader } from '@/components/ui';
-import { useForm } from '@/lib/form';
+import { fetchKeypoints, useForm } from '@/lib/form';
 import type { Rating } from '@/lib/gait';
 import { radius, useTheme } from '@/theme';
 
@@ -13,6 +14,12 @@ export default function FormResult() {
   const { colors } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const analysis = useForm((s) => s.analyses.find((a) => a.id === id));
+  const analyses = useForm((s) => s.analyses);
+  const [keypoints, setKeypoints] = useState<{ frames: number[][][]; fps: number } | null>(null);
+
+  useEffect(() => {
+    if (id && analysis?.status === 'complete') fetchKeypoints(id).then(setKeypoints);
+  }, [id, analysis?.status]);
 
   const ratingColor = (r: Rating) =>
     r === 'good' ? colors.good : r === 'fair' ? colors.info : r === 'watch' ? colors.warn : colors.textMuted;
@@ -21,6 +28,16 @@ export default function FormResult() {
     () => (analysis?.metrics ?? []).filter((m) => m.rating !== 'unknown'),
     [analysis]
   );
+
+  // Compare each metric to the most recent earlier analysis of the same kind.
+  const prevMetrics = useMemo(() => {
+    if (!analysis) return null;
+    const prev = analyses
+      .filter((a) => a.sample === analysis.sample && a.createdAt < analysis.createdAt && a.status === 'complete')
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
+    if (!prev) return null;
+    return new Map(prev.metrics.map((m) => [m.key, m.value]));
+  }, [analysis, analyses]);
 
   if (!analysis) {
     return (
@@ -71,41 +88,64 @@ export default function FormResult() {
         ) : null}
       </Card>
 
+      {keypoints ? (
+        <>
+          <SectionHeader title="Motion" />
+          <Card>
+            <SkeletonPlayer frames={keypoints.frames} fps={keypoints.fps} />
+            <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 10 }}>
+              The pose Stride detected, frame by frame — what the metrics are measured from.
+            </Text>
+          </Card>
+        </>
+      ) : null}
+
       <SectionHeader title="Metrics" />
       <Card style={{ paddingVertical: 4 }}>
-        {knownMetrics.map((m, i) => (
-          <View
-            key={m.key}
-            style={{
-              paddingVertical: 11,
-              borderBottomWidth: i === knownMetrics.length - 1 ? 0 : 1,
-              borderBottomColor: colors.border,
-            }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', flex: 1 }}>
-                {m.label}
-              </Text>
-              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800', marginRight: 8 }}>
-                {m.value}
-                <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600' }}> {m.unit}</Text>
-              </Text>
-              <View
-                style={{
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 999,
-                  backgroundColor: ratingColor(m.rating) + '22',
-                }}>
-                <Text style={{ color: ratingColor(m.rating), fontSize: 11, fontWeight: '800' }}>
-                  {m.rating.toUpperCase()}
+        {knownMetrics.map((m, i) => {
+          const prev = prevMetrics?.get(m.key);
+          const delta =
+            typeof prev === 'number' && typeof m.value === 'number' ? m.value - prev : null;
+          return (
+            <View
+              key={m.key}
+              style={{
+                paddingVertical: 11,
+                borderBottomWidth: i === knownMetrics.length - 1 ? 0 : 1,
+                borderBottomColor: colors.border,
+              }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', flex: 1 }}>
+                  {m.label}
                 </Text>
+                {delta != null && Math.abs(delta) >= 0.1 ? (
+                  <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700', marginRight: 8 }}>
+                    {delta > 0 ? '↑' : '↓'}
+                    {Math.abs(Math.round(delta * 10) / 10)} vs last
+                  </Text>
+                ) : null}
+                <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800', marginRight: 8 }}>
+                  {m.value}
+                  <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '600' }}> {m.unit}</Text>
+                </Text>
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 999,
+                    backgroundColor: ratingColor(m.rating) + '22',
+                  }}>
+                  <Text style={{ color: ratingColor(m.rating), fontSize: 11, fontWeight: '800' }}>
+                    {m.rating.toUpperCase()}
+                  </Text>
+                </View>
               </View>
+              <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 3 }}>
+                {m.note}
+              </Text>
             </View>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 3 }}>
-              {m.note}
-            </Text>
-          </View>
-        ))}
+          );
+        })}
       </Card>
 
       {f?.highlights?.length ? (
