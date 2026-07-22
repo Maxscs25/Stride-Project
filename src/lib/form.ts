@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 
+import { extractPose, isPoseAvailable } from '../../modules/expo-pose';
 import { uuid } from './format';
-import { computeMetrics, overallConfidence, sampleSeries, type Metric } from './gait';
+import { computeMetrics, overallConfidence, sampleSeries, type Frame, type Metric } from './gait';
 import { supabase } from './supabase';
 
 /**
@@ -124,15 +125,41 @@ export async function runSampleAnalysis(): Promise<string | null> {
 }
 
 /**
- * Pose-inference seam. Given a recorded video URI, produce a PoseSeries.
- * On-device (Apple Vision / MoveNet) or a server GPU (Replicate/Modal) plugs
- * in here. Until then this is honest about being unavailable rather than
- * fabricating keypoints.
+ * Real video → on-device pose (Apple Vision) → gait metrics → Claude report.
+ * Degrades honestly when the native pose module isn't in the build.
  */
-export async function analyzeVideo(_videoUri: string): Promise<string | null> {
-  useForm.setState({
-    error:
-      'Video pose analysis is coming next — the capture + metrics + coaching pipeline is ready and waiting on the pose engine. Try a sample analysis to see the output.',
-  });
-  return null;
+export async function analyzeVideo(videoUri: string): Promise<string | null> {
+  if (!isPoseAvailable()) {
+    useForm.setState({
+      error:
+        'Video analysis needs the latest app build (with the pose engine). Rebuild the app, or try a sample to see the output.',
+    });
+    return null;
+  }
+  useForm.setState({ busy: true, error: null });
+  try {
+    const raw = await extractPose(videoUri, 15);
+    const frames: Frame[] = raw.frames.map((f) =>
+      f.map(([x, y, score]) => ({ x, y, score }))
+    );
+    // Need a person tracked across enough of the clip to trust the metrics.
+    const tracked = frames.filter(
+      (f) => (f[15]?.score ?? 0) > 0.3 || (f[16]?.score ?? 0) > 0.3
+    ).length;
+    if (frames.length < 30 || tracked < frames.length * 0.25) {
+      useForm.setState({
+        error:
+          "Couldn't track a runner clearly. Film side-on with your whole body in frame, in good light, for ~10–15s.",
+      });
+      return null;
+    }
+    const metrics = computeMetrics({ frames, fps: raw.fps, view: 'side' });
+    return await analyzeMetrics(metrics, { view: 'side', sample: false });
+  } catch (e) {
+    console.warn('analyzeVideo failed', e);
+    useForm.setState({ error: 'Analysis failed — try filming again side-on in good light.' });
+    return null;
+  } finally {
+    useForm.setState({ busy: false });
+  }
 }

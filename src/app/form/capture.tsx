@@ -85,9 +85,10 @@ function Recorder() {
       const video = await camRef.current.recordAsync({ maxDuration: 20 });
       setRecording(false);
       setProcessing(true);
-      await analyzeVideo(video?.uri ?? '');
+      const id = await analyzeVideo(video?.uri ?? '');
       setProcessing(false);
-      router.back(); // the honest pose-seam message shows on the list screen
+      if (id) router.replace({ pathname: '/form/[id]', params: { id } });
+      else router.back(); // error surfaces on the list screen
     } catch {
       setRecording(false);
       setProcessing(false);

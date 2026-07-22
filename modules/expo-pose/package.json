@@ -1,0 +1,9 @@
+{
+  "name": "expo-pose",
+  "version": "1.0.0",
+  "description": "On-device running-pose extraction via Apple Vision",
+  "main": "index.ts",
+  "author": "Stride",
+  "license": "MIT",
+  "homepage": "https://github.com/Maxscs25/Stride-Project"
+}
