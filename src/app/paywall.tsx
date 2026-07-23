@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
 import { TIERS } from '@/constants/pricing';
@@ -164,11 +164,11 @@ export default function Paywall() {
         account settings.
       </Text>
       <View style={{ flexDirection: 'row', marginTop: 10 }}>
-        <Pressable onPress={() => Linking.openURL('https://stride.app/terms')}>
+        <Pressable onPress={() => router.push('/legal/terms')}>
           <Text style={{ color: colors.textMuted, fontSize: 11, textDecorationLine: 'underline' }}>Terms</Text>
         </Pressable>
         <Text style={{ color: colors.textMuted, fontSize: 11 }}>{'   ·   '}</Text>
-        <Pressable onPress={() => Linking.openURL('https://stride.app/privacy')}>
+        <Pressable onPress={() => router.push('/legal/privacy')}>
           <Text style={{ color: colors.textMuted, fontSize: 11, textDecorationLine: 'underline' }}>Privacy</Text>
         </Pressable>
       </View>

@@ -38,6 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
         <Stack.Screen name="form" options={{ presentation: 'modal' }} />
         <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="legal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

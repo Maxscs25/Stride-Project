@@ -292,6 +292,18 @@ export default function Profile() {
         </Text>
       </Card>
 
+      <SectionHeader title="About" />
+      <Card onPress={() => router.push('/legal/privacy')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons name="lock-closed" size={18} color={colors.textSecondary} style={{ marginRight: 12 }} />
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', flex: 1 }}>Privacy Policy</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Card>
+      <Card onPress={() => router.push('/legal/terms')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons name="document-text" size={18} color={colors.textSecondary} style={{ marginRight: 12 }} />
+        <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700', flex: 1 }}>Terms of Service</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Card>
+
       <Text style={{ color: colors.textMuted, fontSize: 11, lineHeight: 16, marginTop: 8 }}>
         Stride provides educational training guidance only — it is not a medical device and does
         not diagnose injuries. All data stays on this device until cloud sync is enabled.
