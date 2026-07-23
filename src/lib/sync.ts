@@ -3,6 +3,7 @@ import { create } from 'zustand';
 
 import { round1, uuid } from './format';
 import { clearInsights, fetchLatestInsight } from './insights';
+import { loginPurchases, logoutPurchases } from './purchases';
 import { checkStrava, clearStrava } from './strava';
 import { clearSymptoms, fetchSymptomPatterns } from './symptoms';
 import { checkTerra, clearTerra } from './terra';
@@ -39,12 +40,16 @@ export function startAuthSync() {
   });
   supabase.auth.onAuthStateChange((event, session) => {
     useAuth.setState({ session, ready: true });
-    if (event === 'SIGNED_IN' && session) bootstrap(session);
+    if (event === 'SIGNED_IN' && session) {
+      bootstrap(session);
+      loginPurchases(session.user.id);
+    }
     if (event === 'SIGNED_OUT') {
       clearInsights();
       clearStrava();
       clearTerra();
       clearSymptoms();
+      logoutPurchases();
       useApp.getState().resetDemo();
     }
   });

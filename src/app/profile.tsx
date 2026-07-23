@@ -7,6 +7,7 @@ import { ModalShell } from '@/components/ModalShell';
 import { Card, Pill, SectionHeader } from '@/components/ui';
 import { TIERS } from '@/constants/pricing';
 import { connectHealthKit, syncHealthKitRuns, useHealthKit } from '@/lib/healthkit';
+import { useIsPremium } from '@/lib/purchases';
 import { checkStrava, connectStrava, disconnectStrava, useStrava } from '@/lib/strava';
 import { supabase } from '@/lib/supabase';
 import { pullAll, updateProfileRemote, useAuth } from '@/lib/sync';
@@ -32,6 +33,7 @@ export default function Profile() {
   };
 
   const { session } = useAuth();
+  const isPremium = useIsPremium();
   const strava = useStrava();
   const terra = useTerra();
   const healthkit = useHealthKit();
@@ -141,47 +143,62 @@ export default function Profile() {
       </Card>
 
       <SectionHeader title="Membership" />
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', flex: 1 }}>
-            {TIERS.free.name}
-          </Text>
-          <Pill label="CURRENT PLAN" color={colors.textSecondary} bg={colors.surfaceAlt} />
-        </View>
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{TIERS.free.tagline}</Text>
-      </Card>
-
-      <Card style={{ borderColor: colors.accent, borderWidth: 1.5 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', flex: 1 }}>
-            {TIERS.premium.name}
-          </Text>
-          <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '800' }}>
-            {TIERS.premium.price}
-          </Text>
-        </View>
-        {TIERS.premium.features.map((f) => (
-          <View key={f} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-            <Ionicons name="checkmark-circle" size={15} color={colors.accent} style={{ marginRight: 8 }} />
-            <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>{f}</Text>
+      {isPremium ? (
+        <Card style={{ borderColor: colors.accent, borderWidth: 1.5 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', flex: 1 }}>
+              {TIERS.premium.name}
+            </Text>
+            <Pill label="ACTIVE" color={colors.bg} bg={colors.good} />
           </View>
-        ))}
-        <Pressable
-          style={{
-            backgroundColor: colors.accent,
-            borderRadius: radius.md,
-            paddingVertical: 13,
-            alignItems: 'center',
-            marginTop: 10,
-          }}>
-          <Text style={{ color: colors.onAccent, fontSize: 14, fontWeight: '800' }}>
-            Start 14-day free trial · then {TIERS.premium.annual}
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            Thanks for supporting Stride — you have the full AI coach. Manage in App Store settings.
           </Text>
-        </Pressable>
-        <Text style={{ color: colors.textMuted, fontSize: 11, textAlign: 'center', marginTop: 8 }}>
-          Billing wires up via RevenueCat in Phase 2.
-        </Text>
-      </Card>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', flex: 1 }}>
+                {TIERS.free.name}
+              </Text>
+              <Pill label="CURRENT PLAN" color={colors.textSecondary} bg={colors.surfaceAlt} />
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>{TIERS.free.tagline}</Text>
+          </Card>
+
+          <Card
+            onPress={() => (session ? router.push('/paywall') : router.push('/auth'))}
+            style={{ borderColor: colors.accent, borderWidth: 1.5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', flex: 1 }}>
+                {TIERS.premium.name}
+              </Text>
+              <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '800' }}>
+                {TIERS.premium.price}
+              </Text>
+            </View>
+            {TIERS.premium.features.map((f) => (
+              <View key={f} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                <Ionicons name="checkmark-circle" size={15} color={colors.accent} style={{ marginRight: 8 }} />
+                <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>{f}</Text>
+              </View>
+            ))}
+            <View
+              style={{
+                backgroundColor: colors.accent,
+                borderRadius: radius.md,
+                paddingVertical: 13,
+                alignItems: 'center',
+                marginTop: 10,
+              }}>
+              <Text style={{ color: colors.onAccent, fontSize: 14, fontWeight: '800' }}>
+                Start 14-day free trial · then {TIERS.premium.annual}
+              </Text>
+            </View>
+          </Card>
+        </>
+      )}
 
       <SectionHeader title="Connected Apps" />
       {Platform.OS === 'ios' ? (

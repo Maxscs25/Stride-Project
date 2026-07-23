@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { initHealthKit } from '@/lib/healthkit';
+import { initPurchases } from '@/lib/purchases';
 import { startAuthSync } from '@/lib/sync';
 import { useTheme } from '@/theme';
 
@@ -11,6 +12,7 @@ export default function RootLayout() {
   useEffect(() => {
     startAuthSync();
     initHealthKit();
+    initPurchases();
   }, []);
   const navTheme = {
     ...(dark ? DarkTheme : DefaultTheme),
@@ -35,6 +37,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" options={{ presentation: 'modal', gestureEnabled: false }} />
         <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
         <Stack.Screen name="form" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );
