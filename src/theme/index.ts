@@ -16,36 +16,39 @@ export interface ThemeColors {
   info: string;
 }
 
+// Brand: deep cobalt blue (matches the ribbon-runner logo). Green is kept as
+// the "good / healthy" accent (positive states, nutrition), and info shifts to
+// cyan so it stays distinct from the primary blue in charts.
 const darkColors: ThemeColors = {
-  bg: '#0B0F14',
-  surface: '#131A22',
-  surfaceAlt: '#1B2430',
-  border: '#243040',
-  text: '#F2F5F7',
-  textSecondary: '#9FB0BF',
-  textMuted: '#5F7080',
-  accent: '#B7F04D',
-  onAccent: '#0B0F14',
+  bg: '#0A0E17',
+  surface: '#141C2B',
+  surfaceAlt: '#1D2739',
+  border: '#29354E',
+  text: '#F1F4FA',
+  textSecondary: '#A2B0C6',
+  textMuted: '#647589',
+  accent: '#4C7DF6',
+  onAccent: '#FFFFFF',
   good: '#34D399',
   warn: '#FBBF24',
   danger: '#F87171',
-  info: '#60A5FA',
+  info: '#38BDF8',
 };
 
 const lightColors: ThemeColors = {
-  bg: '#F4F7F8',
+  bg: '#F3F6FC',
   surface: '#FFFFFF',
-  surfaceAlt: '#EDF1F4',
-  border: '#DFE6EB',
-  text: '#0C1620',
-  textSecondary: '#48596B',
-  textMuted: '#8496A6',
-  accent: '#5EA500',
+  surfaceAlt: '#EAF0FA',
+  border: '#DBE4F1',
+  text: '#0B1524',
+  textSecondary: '#46586F',
+  textMuted: '#8493A8',
+  accent: '#2560EB',
   onAccent: '#FFFFFF',
   good: '#059669',
   warn: '#D97706',
   danger: '#DC2626',
-  info: '#2563EB',
+  info: '#0EA5E9',
 };
 
 export const radius = { sm: 10, md: 14, lg: 20, xl: 28 };
