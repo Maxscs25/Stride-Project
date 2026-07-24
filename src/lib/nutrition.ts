@@ -1,5 +1,5 @@
 import { addDays, todayKey } from './format';
-import type { FoodLog, Profile, Run } from './types';
+import type { ActivityType, CrossSession, FoodLog, Profile, Run } from './types';
 
 /** Mifflin-St Jeor BMR. */
 export function bmr(p: Profile): number {
@@ -10,6 +10,26 @@ export function bmr(p: Profile): number {
 /** Approx. running energy cost: ~1.0 kcal per kg per km. */
 export function runKcal(p: Profile, miles: number): number {
   return Math.round(miles * 1.60934 * p.weightKg);
+}
+
+// Coarse MET values per cross-training activity (clearly an estimate, not a
+// measurement — used only for the weekly "burned" tally).
+const CROSS_METS: Record<ActivityType, number> = {
+  cycling: 8,
+  swimming: 8,
+  elliptical: 7,
+  rowing: 7,
+  strength: 5,
+  hiking: 6,
+  yoga: 3,
+  other: 5,
+};
+
+/** Rough energy cost of a cross-training session (kcal): MET × kg × hours. */
+export function crossKcal(p: Profile, c: CrossSession): number {
+  const met = CROSS_METS[c.activity] ?? 5;
+  const intensityScale = 0.8 + 0.1 * ((c.intensity ?? 3) - 1); // 1–5 → 0.8–1.2
+  return Math.round(met * p.weightKg * (c.minutes / 60) * intensityScale);
 }
 
 export interface DailyNutrition {

@@ -18,6 +18,9 @@ const TYPE_RPE: Record<WorkoutType, number> = {
   other: 4,
 };
 
+/** Typical RPE for a workout type, used when a run has no explicitly logged RPE. */
+export const typeRpe = (t: WorkoutType) => TYPE_RPE[t];
+
 export const runLoad = (r: Run) => (r.durationS / 60) * (r.rpe ?? TYPE_RPE[r.type]);
 // Cross-training counts at a reduced impact factor for injury-risk purposes.
 export const crossLoad = (c: CrossSession) => c.minutes * (c.intensity ?? 3) * 0.6;

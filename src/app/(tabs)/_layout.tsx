@@ -29,6 +29,13 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
+          name="week"
+          options={{
+            title: 'Week',
+            tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
+          }}
+        />
+        <Tabs.Screen
           name="training"
           options={{
             title: 'Training',
