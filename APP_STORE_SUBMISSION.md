@@ -69,9 +69,9 @@ Stride is for educational and training purposes only and is not a medical device
 - **Age rating:** answer the questionnaire honestly → expected **4+** (no objectionable content; it is fitness/nutrition, not medical treatment).
 - **Price:** Free (with auto-renewable subscription — see below).
 - **Bundle ID:** `com.maxcerviskinner.stride`
-- **Support URL:** `[https://your-site/support]` (a simple contact page or email link)
+- **Support URL:** `https://maxscs25.github.io/Stride-Project/support.html`
 - **Marketing URL:** optional
-- **Privacy Policy URL (required):** host `legal/privacy.html` (see §5) → e.g. `[https://your-site/privacy]`
+- **Privacy Policy URL (required):** `https://maxscs25.github.io/Stride-Project/privacy.html`
 
 **In-App Purchases** (from REVENUECAT_SETUP.md): `stride_premium_monthly` $6.99, `stride_premium_annual` $49.99, 14-day free trial. Add the subscription group and localized display name.
 
@@ -116,14 +116,21 @@ Notes for review:
 
 ---
 
-## 5. Host the legal pages (needed for the Privacy Policy URL)
+## 5. Public pages (Support + Privacy Policy URLs)
+
+Hosted free on GitHub Pages from `docs/` on `main`:
+
+- **Support URL:** `https://maxscs25.github.io/Stride-Project/support.html`
+- **Privacy Policy URL:** `https://maxscs25.github.io/Stride-Project/privacy.html`
+- Terms: `.../terms.html` • Landing: `.../index.html`
+
+Regenerate after any change to `src/constants/legal.ts` (same source as the
+in-app screens, so the public pages can't drift), then commit and push:
 
 ```bash
 cd ~/Downloads/stride
-node scripts/build-legal.mjs      # regenerates legal/privacy.html + legal/terms.html
+node scripts/build-legal.mjs      # rewrites docs/
 ```
-Deploy the `legal/` folder (Vercel, Netlify, GitHub Pages, or your domain) and use
-the resulting URLs for the App Store Privacy Policy URL and the in-app links.
 
 ---
 
@@ -169,7 +176,7 @@ injury-prevention coach", "See your running form", "Fuel for your training").
 - [ ] $99 Apple Developer account
 - [ ] App Store Connect app record + IAP products (REVENUECAT_SETUP.md)
 - [ ] RevenueCat API key set, release build
-- [ ] Privacy Policy URL hosted
+- [x] Privacy Policy URL hosted (GitHub Pages, docs/)
 - [ ] Reviewer demo account created
 - [ ] Screenshots framed to 1290×2796
 - [ ] Fill in the `[bracketed]` placeholders here and in legal.ts

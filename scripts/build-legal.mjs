@@ -1,8 +1,12 @@
-// Generate static HTML for the Privacy Policy and Terms from the same source
-// as the in-app screens, so the App Store / paywall public URLs never drift.
-//   node scripts/build-legal.mjs   → writes legal/privacy.html, legal/terms.html
-// Host the `legal/` folder anywhere (Vercel, GitHub Pages, your domain) and use
-// those URLs in App Store Connect.
+// Generate the public site served by GitHub Pages from ./docs:
+//   index.html, privacy.html, terms.html, support.html
+//
+// The Privacy Policy and Terms come from the same source as the in-app screens
+// (src/constants/legal.ts), so the public URLs can never drift from what the
+// app shows. App Store Connect requires a reachable Support URL and Privacy
+// Policy URL; these are those pages.
+//
+//   node scripts/build-legal.mjs
 
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -10,50 +14,126 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Pull the two docs out of the TS source without a build step.
+// Pull the docs out of the TS source without a build step.
 const src = readFileSync(join(root, 'src/constants/legal.ts'), 'utf8');
 const mod = await import(
   'data:text/javascript,' +
     encodeURIComponent(
-      src
-        .replace(/export interface[\s\S]*?\n}\n/, '')
-        .replace(/:\s*LegalDoc/g, '')
-        .replace(/export const/g, 'export const')
+      src.replace(/export interface[\s\S]*?\n}\n/, '').replace(/:\s*LegalDoc/g, '')
     )
 );
 
+const CONTACT = mod.CONTACT;
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-function html(doc) {
-  const sections = doc.sections
-    .map(
-      (s) =>
-        `<h2>${esc(s.heading)}</h2>` + s.body.map((p) => `<p>${esc(p)}</p>`).join('')
-    )
-    .join('\n');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Stride — ${esc(doc.title)}</title>
-<style>
-  :root { color-scheme: light dark; }
-  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 0 auto;
-         padding: 40px 20px 80px; line-height: 1.6; color: #1a1a1a; background: #fff; }
-  @media (prefers-color-scheme: dark){ body{ color:#e8e8e8; background:#0b0f14; } }
-  h1 { font-size: 28px; margin-bottom: 4px; }
-  .updated { color: #888; font-size: 13px; margin-bottom: 24px; }
-  .intro { font-size: 16px; margin-bottom: 28px; }
+const STYLE = `
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fff; --muted:#6b7280; --line:#e5e7eb; --accent:#2560EB; }
+  @media (prefers-color-scheme: dark){
+    :root { --fg:#e8e8e8; --bg:#0b0f14; --muted:#9aa4b2; --line:#1f2937; --accent:#4C7DF6; }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 720px;
+         margin: 0 auto; padding: 40px 20px 80px; line-height: 1.6; color: var(--fg); background: var(--bg); }
+  a { color: var(--accent); }
+  nav { display: flex; gap: 18px; flex-wrap: wrap; padding-bottom: 20px; margin-bottom: 28px;
+        border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+  nav a { text-decoration: none; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.5px; }
   h2 { font-size: 17px; margin-top: 28px; }
-  p { font-size: 15px; }
-</style></head><body>
-<h1>Stride — ${esc(doc.title)}</h1>
+  .updated, .tagline { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .intro { font-size: 16px; margin-bottom: 28px; }
+  p, li { font-size: 15px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 13px; }
+`;
+
+const NAV = `<nav>
+  <a href="./index.html">Stride</a>
+  <a href="./support.html">Support</a>
+  <a href="./privacy.html">Privacy</a>
+  <a href="./terms.html">Terms</a>
+</nav>`;
+
+const page = (title, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stride — ${esc(title)}</title>
+<style>${STYLE}</style></head><body>
+${NAV}
+${body}
+<footer>Stride is for educational and training purposes only and is not a medical device.</footer>
+</body></html>`;
+
+function legalPage(doc) {
+  const sections = doc.sections
+    .map((s) => `<h2>${esc(s.heading)}</h2>` + s.body.map((p) => `<p>${esc(p)}</p>`).join(''))
+    .join('\n');
+  return page(
+    doc.title,
+    `<h1>${esc(doc.title)}</h1>
 <div class="updated">Last updated ${esc(doc.updated)}</div>
 <p class="intro">${esc(doc.intro)}</p>
-${sections}
-</body></html>`;
+${sections}`
+  );
 }
 
-const out = join(root, 'legal');
+const indexPage = page(
+  'AI Running Coach',
+  `<h1>Stride</h1>
+<div class="tagline">Train smart, run injury-free.</div>
+<p class="intro">Stride is an AI running coach that helps you train consistently and avoid
+injury — combining fast daily logging with weekly insights drawn from real training-load
+science, on-device running-form analysis, and nutrition that adapts to your mileage.</p>
+<h2>Get help</h2>
+<p>Questions, bugs, or feedback: <a href="mailto:${CONTACT}">${CONTACT}</a>. See the
+<a href="./support.html">support page</a> for common questions.</p>
+<h2>Legal</h2>
+<p><a href="./privacy.html">Privacy Policy</a> &middot; <a href="./terms.html">Terms of Service</a></p>`
+);
+
+const supportPage = page(
+  'Support',
+  `<h1>Support</h1>
+<div class="tagline">We read every message.</div>
+<p class="intro">Email <a href="mailto:${CONTACT}">${CONTACT}</a> with questions, bugs, or
+feedback. Including your device model and iOS version helps us reproduce issues faster.</p>
+
+<h2>Runs from my watch aren't showing up</h2>
+<p>Stride imports runs through Apple Health. Open the Health app → Sharing → Apps →
+Stride, and make sure Workouts is enabled. Runs recorded by Garmin, COROS, or Apple Watch
+appear once those apps have written them to Health.</p>
+
+<h2>Form analysis says it couldn't track a runner</h2>
+<p>Film side-on, in good light, with your whole body in frame for about 10–15 seconds — a
+treadmill works well. Pose estimation runs on your device, so it needs a clear, steady view.</p>
+
+<h2>Managing your subscription</h2>
+<p>Stride Premium is billed through your Apple ID. To view, change, or cancel it, open
+iOS Settings → tap your name → Subscriptions. Cancelling at least 24 hours before the
+period ends stops the next charge, and a free trial converts to a paid subscription unless
+cancelled before it ends. Purchases can be restored from the paywall screen.</p>
+
+<h2>Deleting your data</h2>
+<p>You can delete your account and its data from inside the app. Running-form clips are
+stored privately and automatically deleted after 30 days; you can remove an analysis and
+its clip at any time by long-pressing it in the Running Form list.</p>
+
+<h2>Sharing with a coach</h2>
+<p>Coach sharing is off by default. You choose exactly what a coach can see — mileage,
+workouts, wellness, notes, nutrition, checklist — and can revoke access at any time, which
+takes effect immediately.</p>
+
+<h2>A note on health guidance</h2>
+<p>Stride's coaching, nutrition estimates, and form feedback are educational only. They are
+not medical advice and cannot replace evaluation by a qualified healthcare or sports-medicine
+professional. If something hurts, see a professional.</p>`
+);
+
+const out = join(root, 'docs');
 mkdirSync(out, { recursive: true });
-writeFileSync(join(out, 'privacy.html'), html(mod.PRIVACY));
-writeFileSync(join(out, 'terms.html'), html(mod.TERMS));
-console.log('Wrote legal/privacy.html and legal/terms.html');
+writeFileSync(join(out, 'index.html'), indexPage);
+writeFileSync(join(out, 'support.html'), supportPage);
+writeFileSync(join(out, 'privacy.html'), legalPage(mod.PRIVACY));
+writeFileSync(join(out, 'terms.html'), legalPage(mod.TERMS));
+// Skip Jekyll so GitHub Pages serves these files verbatim.
+writeFileSync(join(out, '.nojekyll'), '');
+console.log('Wrote docs/: index.html, support.html, privacy.html, terms.html');

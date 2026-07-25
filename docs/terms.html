@@ -2,17 +2,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stride — Terms of Service</title>
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 0 auto;
-         padding: 40px 20px 80px; line-height: 1.6; color: #1a1a1a; background: #fff; }
-  @media (prefers-color-scheme: dark){ body{ color:#e8e8e8; background:#0b0f14; } }
-  h1 { font-size: 28px; margin-bottom: 4px; }
-  .updated { color: #888; font-size: 13px; margin-bottom: 24px; }
-  .intro { font-size: 16px; margin-bottom: 28px; }
+  :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fff; --muted:#6b7280; --line:#e5e7eb; --accent:#2560EB; }
+  @media (prefers-color-scheme: dark){
+    :root { --fg:#e8e8e8; --bg:#0b0f14; --muted:#9aa4b2; --line:#1f2937; --accent:#4C7DF6; }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 720px;
+         margin: 0 auto; padding: 40px 20px 80px; line-height: 1.6; color: var(--fg); background: var(--bg); }
+  a { color: var(--accent); }
+  nav { display: flex; gap: 18px; flex-wrap: wrap; padding-bottom: 20px; margin-bottom: 28px;
+        border-bottom: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+  nav a { text-decoration: none; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.5px; }
   h2 { font-size: 17px; margin-top: 28px; }
-  p { font-size: 15px; }
+  .updated, .tagline { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .intro { font-size: 16px; margin-bottom: 28px; }
+  p, li { font-size: 15px; }
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 13px; }
 </style></head><body>
-<h1>Stride — Terms of Service</h1>
+<nav>
+  <a href="./index.html">Stride</a>
+  <a href="./support.html">Support</a>
+  <a href="./privacy.html">Privacy</a>
+  <a href="./terms.html">Terms</a>
+</nav>
+<h1>Terms of Service</h1>
 <div class="updated">Last updated July 24, 2026</div>
 <p class="intro">These Terms govern your use of the Stride app. By creating an account or using Stride, you agree to them. If you do not agree, do not use the app.</p>
 <h2>1. Eligibility</h2><p>You must be at least 13 years old to use Stride.</p>
@@ -26,4 +41,5 @@
 <h2>9. Termination</h2><p>You may stop using Stride and delete your account at any time. We may suspend or terminate access for violations of these Terms.</p>
 <h2>10. Changes &amp; governing law</h2><p>We may update these Terms; continued use after changes means you accept them. These Terms are governed by the laws of the State of Idaho, United States, without regard to conflict-of-laws rules.</p>
 <h2>11. Contact</h2><p>Questions about these Terms: maxcerviskinner@gmail.com.</p>
+<footer>Stride is for educational and training purposes only and is not a medical device.</footer>
 </body></html>

@@ -14,7 +14,7 @@ export interface LegalDoc {
   sections: { heading: string; body: string[] }[];
 }
 
-const CONTACT = 'maxcerviskinner@gmail.com';
+export const CONTACT = 'maxcerviskinner@gmail.com';
 const ENTITY = 'Maximus Sergio Cervi-Skinner';
 const UPDATED = 'July 24, 2026';
 
