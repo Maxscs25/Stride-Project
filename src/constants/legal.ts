@@ -4,7 +4,7 @@
  * static HTML for the public App Store URL (scripts/build-legal.mjs).
  *
  * NOTE: this is a tailored draft, not legal advice — have a lawyer review it
- * before a public launch, and replace the [bracketed] placeholders.
+ * before a public launch.
  */
 
 export interface LegalDoc {
@@ -14,9 +14,9 @@ export interface LegalDoc {
   sections: { heading: string; body: string[] }[];
 }
 
-const CONTACT = '[support@stride.app]';
-const ENTITY = '[Your Name / Company]';
-const UPDATED = 'July 23, 2026';
+const CONTACT = 'maxcerviskinner@gmail.com';
+const ENTITY = 'Maximus Sergio Cervi-Skinner';
+const UPDATED = 'July 24, 2026';
 
 export const PRIVACY: LegalDoc = {
   title: 'Privacy Policy',
@@ -173,7 +173,7 @@ export const TERMS: LegalDoc = {
     {
       heading: '10. Changes & governing law',
       body: [
-        'We may update these Terms; continued use after changes means you accept them. These Terms are governed by the laws of [your jurisdiction], without regard to conflict-of-laws rules.',
+        'We may update these Terms; continued use after changes means you accept them. These Terms are governed by the laws of the State of Idaho, United States, without regard to conflict-of-laws rules.',
       ],
     },
     {

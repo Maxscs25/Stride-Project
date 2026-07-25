@@ -2,16 +2,22 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { create } from 'zustand';
 
 import { extractPose, isPoseAvailable } from '../../modules/expo-pose';
+import { DEMO_POSE } from '../constants/demoPose';
 import { uuid } from './format';
 import {
   computeMetrics,
   overallConfidence,
   packFrames,
-  sampleSeries,
   type Frame,
   type Metric,
 } from './gait';
 import { supabase } from './supabase';
+
+/** Bundled demo clip the Sample analysis runs on, with DEMO_POSE as its pose. */
+const DEMO_VIDEO = require('../../assets/demo/demo-run.mp4');
+
+/** A playable source: a bundled asset module id, or a file/remote URI. */
+export type VideoSource = string | number;
 
 export interface Keypoints {
   frames: number[][][];
@@ -45,6 +51,9 @@ export interface FormAnalysis {
   confidence: number;
   findings: FormFindings | null;
   sample: boolean;
+  /** Pose came from the bundled demo clip, so the video overlay can be shown.
+   *  Older samples predate the clip and hold synthetic pose — no video. */
+  demoClip: boolean;
 }
 
 export const useForm = create<{
@@ -62,7 +71,12 @@ interface Row {
   created_at: string;
   view_angle: 'side' | 'rear' | null;
   status: FormAnalysis['status'];
-  metrics: { metrics?: Metric[]; confidence?: number; sample?: boolean } | null;
+  metrics: {
+    metrics?: Metric[];
+    confidence?: number;
+    sample?: boolean;
+    demoClip?: boolean;
+  } | null;
   findings: FormFindings | null;
 }
 
@@ -76,6 +90,7 @@ function mapRow(r: Row): FormAnalysis {
     confidence: r.metrics?.confidence ?? 0,
     findings: r.findings,
     sample: !!r.metrics?.sample,
+    demoClip: !!r.metrics?.demoClip,
   };
 }
 
@@ -103,6 +118,7 @@ async function analyzeMetrics(
   opts: {
     view: 'side' | 'rear';
     sample: boolean;
+    demoClip?: boolean;
     frames?: Frame[];
     fps?: number;
     duration?: number;
@@ -130,7 +146,12 @@ async function analyzeMetrics(
     user_id: uid,
     view_angle: opts.view,
     status: 'processing',
-    metrics: { metrics, confidence: overallConfidence(metrics), sample: opts.sample },
+    metrics: {
+      metrics,
+      confidence: overallConfidence(metrics),
+      sample: opts.sample,
+      demoClip: !!opts.demoClip,
+    },
     keypoints,
   });
   if (insErr) {
@@ -168,9 +189,10 @@ async function uploadVideo(uid: string, id: string, uri: string) {
   }
 }
 
-/** A playable video source for an analysis: the in-memory local file if we
- *  just captured it, else a signed URL from storage. */
-export async function getVideoSource(id: string): Promise<string | null> {
+/** A playable video source for an analysis: the bundled clip for a sample, the
+ *  in-memory local file if we just captured it, else a signed URL from storage. */
+export async function getVideoSource(id: string): Promise<VideoSource | null> {
+  if (useForm.getState().analyses.find((a) => a.id === id)?.demoClip) return DEMO_VIDEO;
   const local = useForm.getState().localVideos[id];
   if (local) return local;
   const { data: row } = await supabase
@@ -185,17 +207,29 @@ export async function getVideoSource(id: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
-/** Demonstrate the full pipeline with synthetic keypoints (clearly a sample). */
+/**
+ * Demonstrate the full pipeline on the bundled demo clip (clearly a sample).
+ * The pose was extracted offline by the same Vision model the app uses on
+ * device, so this runs the real metrics engine on real footage — and the
+ * overlay shows the skeleton tracking an actual runner, which also works in
+ * the Simulator where Vision's pose model is unavailable.
+ */
 export async function runSampleAnalysis(): Promise<string | null> {
   useForm.setState({ busy: true, error: null });
   try {
-    const series = sampleSeries();
-    const metrics = computeMetrics(series);
+    const frames: Frame[] = DEMO_POSE.frames.map((f) =>
+      f.map(([x, y, score]) => ({ x, y, score }))
+    );
+    const metrics = computeMetrics({ frames, fps: DEMO_POSE.fps, view: 'side' });
     return await analyzeMetrics(metrics, {
       view: 'side',
       sample: true,
-      frames: series.frames,
-      fps: series.fps,
+      demoClip: true,
+      frames,
+      fps: DEMO_POSE.fps,
+      duration: DEMO_POSE.duration,
+      width: DEMO_POSE.width,
+      height: DEMO_POSE.height,
     });
   } finally {
     useForm.setState({ busy: false });

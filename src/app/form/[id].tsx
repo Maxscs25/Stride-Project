@@ -6,7 +6,13 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { ModalShell } from '@/components/ModalShell';
 import { SkeletonPlayer, VideoOverlay } from '@/components/SkeletonPlayer';
 import { Card, SectionHeader } from '@/components/ui';
-import { fetchKeypoints, getVideoSource, useForm, type Keypoints } from '@/lib/form';
+import {
+  fetchKeypoints,
+  getVideoSource,
+  useForm,
+  type Keypoints,
+  type VideoSource,
+} from '@/lib/form';
 import type { Rating } from '@/lib/gait';
 import { radius, useTheme } from '@/theme';
 
@@ -16,7 +22,7 @@ export default function FormResult() {
   const analysis = useForm((s) => s.analyses.find((a) => a.id === id));
   const analyses = useForm((s) => s.analyses);
   const [keypoints, setKeypoints] = useState<Keypoints | null>(null);
-  const [videoSource, setVideoSource] = useState<string | null>(null);
+  const [videoSource, setVideoSource] = useState<VideoSource | null>(null);
 
   useEffect(() => {
     if (id && analysis?.status === 'complete') {
@@ -111,7 +117,7 @@ export default function FormResult() {
             )}
             <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 10 }}>
               {videoSource
-                ? 'Your run with the detected pose overlaid — tap the skeleton toggle to compare.'
+                ? `${analysis.sample ? 'Demo footage' : 'Your run'} with the detected pose overlaid — tap the skeleton toggle to compare.`
                 : 'The pose Stride detected, frame by frame — what the metrics are measured from.'}
             </Text>
           </Card>

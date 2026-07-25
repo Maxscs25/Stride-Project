@@ -143,7 +143,8 @@ export function VideoOverlay({
   duration,
   aspect,
 }: {
-  source: string;
+  /** A remote/file URI, or a bundled asset module id from require(). */
+  source: string | number;
   frames: number[][][];
   duration: number;
   aspect: number;
