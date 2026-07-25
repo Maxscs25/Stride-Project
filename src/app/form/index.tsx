@@ -1,13 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
 import { Card, Pill, SectionHeader } from '@/components/ui';
 import { fmtDate } from '@/lib/format';
-import { analyzeVideo, clearForm, fetchAnalyses, runSampleAnalysis, useForm } from '@/lib/form';
+import {
+  analyzeVideo,
+  clearForm,
+  deleteAnalysis,
+  fetchAnalyses,
+  runSampleAnalysis,
+  useForm,
+} from '@/lib/form';
 import { useAuth } from '@/lib/sync';
 import { radius, useTheme } from '@/theme';
 
@@ -147,6 +154,11 @@ export default function FormList() {
       ) : null}
 
       <SectionHeader title="Your Analyses" />
+      {analyses.length > 0 ? (
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: -4, marginBottom: 10 }}>
+          Long-press an analysis to delete it.
+        </Text>
+      ) : null}
       {loaded && analyses.length === 0 ? (
         <Card>
           <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
@@ -155,9 +167,26 @@ export default function FormList() {
         </Card>
       ) : null}
       {analyses.map((a) => (
-        <Link key={a.id} href={{ pathname: '/form/[id]', params: { id: a.id } }} asChild>
-          <Pressable>
-            <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Pressable
+          key={a.id}
+          onPress={() => router.push({ pathname: '/form/[id]', params: { id: a.id } })}
+          onLongPress={() =>
+            Alert.alert(
+              'Delete this analysis?',
+              'Its report and the clip it was made from will be permanently removed.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => {
+                    deleteAnalysis(a.id);
+                  },
+                },
+              ]
+            )
+          }>
+          <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
               <View
                 style={{
                   width: 40,
@@ -192,8 +221,7 @@ export default function FormList() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Card>
-          </Pressable>
-        </Link>
+        </Pressable>
       ))}
     </ModalShell>
   );

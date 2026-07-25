@@ -208,6 +208,32 @@ export async function getVideoSource(id: string): Promise<VideoSource | null> {
 }
 
 /**
+ * Permanently delete an analysis and the stored clip it was made from. Failed
+ * runs shouldn't be stuck in the list, and the row holds the user's pose data,
+ * so there has to be a way to remove it.
+ */
+export async function deleteAnalysis(id: string): Promise<boolean> {
+  const { data: row } = await supabase
+    .from('form_analyses')
+    .select('video_path')
+    .eq('id', id)
+    .maybeSingle();
+  if (row?.video_path) {
+    await supabase.storage.from('form-videos').remove([row.video_path]);
+  }
+  const { error } = await supabase.from('form_analyses').delete().eq('id', id);
+  if (error) {
+    useForm.setState({ error: 'Could not delete that analysis — try again.' });
+    return false;
+  }
+  useForm.setState((s) => {
+    const { [id]: _removed, ...localVideos } = s.localVideos;
+    return { analyses: s.analyses.filter((a) => a.id !== id), localVideos, error: null };
+  });
+  return true;
+}
+
+/**
  * Demonstrate the full pipeline on the bundled demo clip (clearly a sample).
  * The pose was extracted offline by the same Vision model the app uses on
  * device, so this runs the real metrics engine on real footage — and the
