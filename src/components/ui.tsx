@@ -155,6 +155,62 @@ export function Pill({ label, color, bg }: { label: string; color: string; bg: s
   );
 }
 
+export function UpsellCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Card style={{ alignItems: 'center', paddingVertical: 28 }}>
+      <View
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          backgroundColor: colors.accent + '1A',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 14,
+        }}>
+        <Ionicons name={icon} size={22} color={colors.accent} />
+      </View>
+      <Text style={{ color: colors.text, fontSize: 16, fontWeight: '800', textAlign: 'center' }}>
+        {title}
+      </Text>
+      <Text
+        style={{
+          color: colors.textSecondary,
+          fontSize: 13,
+          lineHeight: 19,
+          textAlign: 'center',
+          marginTop: 6,
+          marginBottom: 18,
+          paddingHorizontal: 8,
+        }}>
+        {description}
+      </Text>
+      <Link href="/paywall" asChild>
+        <Pressable
+          style={{
+            backgroundColor: colors.accent,
+            borderRadius: radius.md,
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+          }}>
+          <Text style={{ color: colors.onAccent, fontSize: 14, fontWeight: '800' }}>
+            Unlock Premium
+          </Text>
+        </Pressable>
+      </Link>
+    </Card>
+  );
+}
+
 export function Chip({
   label,
   selected,

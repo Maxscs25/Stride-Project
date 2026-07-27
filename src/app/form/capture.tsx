@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { ModalShell } from '@/components/ModalShell';
+import { UpsellCard } from '@/components/ui';
 import { analyzeVideo } from '@/lib/form';
+import { useIsPremium } from '@/lib/purchases';
 import { useTheme } from '@/theme';
 
 // expo-camera is native — absent until the dev build includes it.
@@ -19,8 +21,22 @@ try {
 }
 
 export default function Capture() {
+  const premium = useIsPremium();
+  if (!premium) return <Locked />;
   if (!CameraView) return <Unavailable />;
   return <Recorder />;
+}
+
+function Locked() {
+  return (
+    <ModalShell title="Record a Run">
+      <UpsellCard
+        icon="videocam"
+        title="Recording is a Premium feature"
+        description="Upgrade to analyze your own running form with on-device AI."
+      />
+    </ModalShell>
+  );
 }
 
 function Unavailable() {

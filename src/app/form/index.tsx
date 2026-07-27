@@ -15,6 +15,7 @@ import {
   runSampleAnalysis,
   useForm,
 } from '@/lib/form';
+import { useIsPremium } from '@/lib/purchases';
 import { useAuth } from '@/lib/sync';
 import { radius, useTheme } from '@/theme';
 
@@ -24,12 +25,14 @@ function FormAction({
   onPress,
   primary,
   busy,
+  locked,
 }: {
   icon: string;
   label: string;
   onPress: () => void;
   primary?: boolean;
   busy?: boolean;
+  locked?: boolean;
 }) {
   const { colors } = useTheme();
   return (
@@ -45,6 +48,22 @@ function FormAction({
         paddingVertical: 15,
         alignItems: 'center',
       }}>
+      {locked ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 6,
+            right: 6,
+            width: 16,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: colors.warn,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Ionicons name="lock-closed" size={9} color="#fff" />
+        </View>
+      ) : null}
       {busy ? (
         <ActivityIndicator color={colors.accent} />
       ) : (
@@ -69,6 +88,7 @@ export default function FormList() {
   const { colors } = useTheme();
   const { session } = useAuth();
   const { analyses, loaded, busy, error } = useForm();
+  const premium = useIsPremium();
 
   useEffect(() => {
     if (session) fetchAnalyses();
@@ -76,6 +96,7 @@ export default function FormList() {
   }, [session]);
 
   const pickFromLibrary = async () => {
+    if (!premium) return router.push('/paywall');
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) return;
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -118,9 +139,15 @@ export default function FormList() {
           icon="videocam"
           label="Record"
           primary
-          onPress={() => router.push('/form/capture')}
+          locked={!premium}
+          onPress={() => router.push(premium ? '/form/capture' : '/paywall')}
         />
-        <FormAction icon="images" label="Choose clip" onPress={pickFromLibrary} />
+        <FormAction
+          icon="images"
+          label="Choose clip"
+          locked={!premium}
+          onPress={pickFromLibrary}
+        />
         <FormAction
           icon="sparkles"
           label="Sample"

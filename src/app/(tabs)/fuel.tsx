@@ -4,9 +4,10 @@ import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { ProgressRing } from '@/components/ProgressRing';
-import { Card, ProgressBar, Screen, SectionHeader } from '@/components/ui';
+import { Card, ProgressBar, Screen, SectionHeader, UpsellCard } from '@/components/ui';
 import { todayKey } from '@/lib/format';
 import { dailyTargets, fuelStatus } from '@/lib/nutrition';
+import { useIsPremium } from '@/lib/purchases';
 import { deleteFood } from '@/lib/sync';
 import { MEAL_META, type Meal } from '@/lib/types';
 import { useApp } from '@/store';
@@ -47,6 +48,19 @@ export default function Fuel() {
   );
   const remaining = t.targetKcal - eaten.kcal;
   const status = useMemo(() => fuelStatus(profile, runs, foodLogs), [profile, runs, foodLogs]);
+  const premium = useIsPremium();
+
+  if (!premium) {
+    return (
+      <Screen title="Fuel" subtitle="Eat for your training">
+        <UpsellCard
+          icon="nutrition"
+          title="Nutrition is a Premium feature"
+          description="Track calories and macros scaled to your training, scan barcodes, and get under-fueling alerts."
+        />
+      </Screen>
+    );
+  }
 
   return (
     <Screen title="Fuel" subtitle="Eat for your training">

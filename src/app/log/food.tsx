@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ModalShell, finishLogging } from '@/components/ModalShell';
-import { Chip, Field } from '@/components/ui';
+import { Chip, Field, UpsellCard } from '@/components/ui';
 import { searchFoods } from '@/lib/food';
 import { todayKey } from '@/lib/format';
+import { useIsPremium } from '@/lib/purchases';
 import { logFood } from '@/lib/sync';
 import { MEAL_META, type FoodItem, type Meal } from '@/lib/types';
 import { radius, useTheme } from '@/theme';
@@ -32,6 +33,7 @@ export default function LogFood() {
   const [manual, setManual] = useState(false);
   const [servings, setServings] = useState('1');
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const premium = useIsPremium();
 
   useEffect(() => {
     if (params.scanned) {
@@ -73,6 +75,18 @@ export default function LogFood() {
     });
     finishLogging();
   };
+
+  if (!premium) {
+    return (
+      <ModalShell title="Log Food">
+        <UpsellCard
+          icon="nutrition"
+          title="Nutrition logging is Premium"
+          description="Search foods, scan barcodes, and track calories & macros scaled to your training."
+        />
+      </ModalShell>
+    );
+  }
 
   // ---------- Manual entry ----------
   if (manual) {
