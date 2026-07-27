@@ -28,6 +28,10 @@ export const usePurchases = create<{
   configured: boolean;
   isPremium: boolean;
   packages: Pkg[];
+  /** True once an offerings fetch has completed (success or failure) — lets
+   *  the UI tell "still loading" apart from "loaded but no products yet"
+   *  (e.g. the App Store subscriptions haven't cleared review). */
+  offeringsLoaded: boolean;
   busy: boolean;
   error: string | null;
 }>(() => ({
@@ -35,6 +39,7 @@ export const usePurchases = create<{
   configured: false,
   isPremium: false,
   packages: [],
+  offeringsLoaded: false,
   busy: false,
   error: null,
 }));
@@ -98,6 +103,8 @@ export async function loadOfferings() {
     usePurchases.setState({ packages: offerings?.current?.availablePackages ?? [] });
   } catch (e) {
     console.warn('RevenueCat offerings failed', e);
+  } finally {
+    usePurchases.setState({ offeringsLoaded: true });
   }
 }
 

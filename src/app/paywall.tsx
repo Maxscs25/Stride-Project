@@ -24,7 +24,7 @@ function pkgLabel(pkg: Pkg): { title: string; sub: string } {
 
 export default function Paywall() {
   const { colors } = useTheme();
-  const { configured, packages, isPremium, busy, error } = usePurchases();
+  const { configured, packages, offeringsLoaded, isPremium, busy, error } = usePurchases();
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function Paywall() {
         ))}
       </View>
 
-      {!configured ? (
+      {!configured || (offeringsLoaded && packages.length === 0) ? (
         <View
           style={{
             backgroundColor: colors.surfaceAlt,
@@ -86,10 +86,10 @@ export default function Paywall() {
           </Text>
           <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 19 }}>
             Premium will be {TIERS.premium.price} ({TIERS.premium.annual}) with a 14-day free trial.
-            Purchasing turns on once the App Store products are set up.
+            Purchasing turns on once the App Store products clear Apple's review.
           </Text>
         </View>
-      ) : packages.length === 0 ? (
+      ) : !offeringsLoaded ? (
         <ActivityIndicator color={colors.accent} style={{ marginVertical: 20 }} />
       ) : (
         <>
