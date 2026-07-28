@@ -9,6 +9,12 @@ import type { GoalReminder, Profile } from './types';
  * Deliberately local (not push): the content is already on-device, so there's
  * no server, no push tokens, and it keeps working offline. Everything here
  * no-ops without the native module (Expo Go / web) so the app still runs.
+ *
+ * NOTE: expo-notifications is intentionally NOT listed in app.json plugins.
+ * Its config plugin adds the `aps-environment` entitlement, which requires the
+ * Push Notifications capability on the provisioning profile — and we never send
+ * push. The native module is autolinked as a dependency, so local scheduling
+ * works without claiming a capability the app doesn't use.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
