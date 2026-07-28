@@ -2,6 +2,7 @@ import { addDays, todayKey, uid, weekStartKey } from './format';
 import type {
   ChecklistDef,
   CrossSession,
+  FavoriteFood,
   FoodLog,
   JournalEntry,
   PersonalRecord,
@@ -46,6 +47,7 @@ export interface SeedData {
   hydration: Record<string, number>;
   prs: PersonalRecord[];
   foodLogs: FoodLog[];
+  favoriteFoods: FavoriteFood[];
 }
 
 export function buildSeed(): SeedData {
@@ -210,5 +212,11 @@ export function buildSeed(): SeedData {
     { id: uid(), date: today, meal: 'snack', name: 'Greek yogurt & granola', servings: 1, calories: 260, proteinG: 18, carbsG: 32, fatG: 6, entryMethod: 'search' },
   ];
 
-  return { runs, cross, journal, shoes, checklistDefs, completions, hydration, prs, foodLogs };
+  const favoriteFoods: FavoriteFood[] = [
+    { id: uid(), name: 'Banana', servingDesc: '100 g', calories: 89, proteinG: 1, carbsG: 23, fatG: 0 },
+    { id: uid(), name: 'Chicken Breast Fillets', brand: 'Tesco', servingDesc: '100 g', calories: 106, proteinG: 24, carbsG: 0, fatG: 1 },
+    { id: uid(), name: 'Nonfat Greek Yogurt', brand: 'Chobani', servingDesc: '100 g', calories: 53, proteinG: 9, carbsG: 4, fatG: 0 },
+  ];
+
+  return { runs, cross, journal, shoes, checklistDefs, completions, hydration, prs, foodLogs, favoriteFoods };
 }

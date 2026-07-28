@@ -8,9 +8,15 @@ import { Chip, Field, UpsellCard } from '@/components/ui';
 import { searchFoods } from '@/lib/food';
 import { todayKey } from '@/lib/format';
 import { useIsPremium } from '@/lib/purchases';
-import { logFood } from '@/lib/sync';
-import { MEAL_META, type FoodItem, type Meal } from '@/lib/types';
+import { addFavoriteFood, logFood, removeFavoriteFood } from '@/lib/sync';
+import { MEAL_META, type FavoriteFood, type FoodItem, type Meal } from '@/lib/types';
+import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
+
+/** Same food, ignoring which favorite/search instance it came from. */
+function sameFood(a: FoodItem, b: FoodItem): boolean {
+  return a.name === b.name && (a.brand ?? '') === (b.brand ?? '');
+}
 
 function mealForNow(): Meal {
   const h = new Date().getHours();
@@ -34,6 +40,7 @@ export default function LogFood() {
   const [servings, setServings] = useState('1');
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const premium = useIsPremium();
+  const favoriteFoods = useApp((s) => s.favoriteFoods);
 
   useEffect(() => {
     if (params.scanned) {
@@ -96,6 +103,7 @@ export default function LogFood() {
   // ---------- Confirm a selected/scanned item ----------
   if (selected) {
     const mult = Math.max(0.25, parseFloat(servings) || 1);
+    const favorite = favoriteFoods.find((f) => sameFood(f, selected));
     return (
       <ModalShell title="Add Food">
         <MealPicker meal={meal} onChange={setMeal} />
@@ -108,12 +116,29 @@ export default function LogFood() {
             padding: 16,
             marginBottom: 16,
           }}>
-          <Text style={{ color: colors.text, fontSize: 17, fontWeight: '800' }}>{selected.name}</Text>
-          {selected.brand ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>
-              {selected.brand}
-            </Text>
-          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontSize: 17, fontWeight: '800' }}>
+                {selected.name}
+              </Text>
+              {selected.brand ? (
+                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 2 }}>
+                  {selected.brand}
+                </Text>
+              ) : null}
+            </View>
+            <Pressable
+              hitSlop={8}
+              onPress={() =>
+                favorite ? removeFavoriteFood(favorite.id) : addFavoriteFood(selected)
+              }>
+              <Ionicons
+                name={favorite ? 'star' : 'star-outline'}
+                size={22}
+                color={favorite ? colors.warn : colors.textMuted}
+              />
+            </Pressable>
+          </View>
           <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
             Per {selected.servingDesc ?? 'serving'}
           </Text>
@@ -199,6 +224,48 @@ export default function LogFood() {
         autoCapitalize="none"
         autoFocus
       />
+
+      {!query.trim() && favoriteFoods.length > 0 ? (
+        <View style={{ marginBottom: 4 }}>
+          <Text
+            style={{
+              color: colors.textMuted,
+              fontSize: 11,
+              fontWeight: '800',
+              letterSpacing: 0.6,
+              marginBottom: 4,
+            }}>
+            FAVORITES
+          </Text>
+          {favoriteFoods.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => {
+                setServings('1');
+                setSelected(item);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+              }}>
+              <Ionicons name="star" size={16} color={colors.warn} style={{ marginRight: 10 }} />
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }} numberOfLines={1}>
+                  {item.brand ? `${item.brand} · ` : ''}
+                  {item.calories} kcal · {item.proteinG}P {item.carbsG}C {item.fatG}F
+                </Text>
+              </View>
+              <Ionicons name="add-circle" size={22} color={colors.accent} />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       {searching ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 12 }} />

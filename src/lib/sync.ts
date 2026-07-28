@@ -8,7 +8,7 @@ import { checkStrava, clearStrava } from './strava';
 import { clearSymptoms, fetchSymptomPatterns } from './symptoms';
 import { checkTerra, clearTerra } from './terra';
 import { supabase } from './supabase';
-import type { CrossSession, FoodLog, JournalEntry, Profile, Run, Shoe } from './types';
+import type { CrossSession, FavoriteFood, FoodLog, JournalEntry, Profile, Run, Shoe } from './types';
 import { useApp } from '@/store';
 
 /**
@@ -86,7 +86,7 @@ export async function pullAll(fallbackName?: string) {
   const uid = sess.session?.user.id;
   if (!uid) return;
 
-  const [runsQ, crossQ, journalQ, shoesQ, foodQ, profileQ] = await Promise.all([
+  const [runsQ, crossQ, journalQ, shoesQ, foodQ, favoritesQ, profileQ] = await Promise.all([
     supabase.from('runs').select('*').order('local_date', { ascending: true }),
     supabase.from('cross_training').select('*').order('local_date', { ascending: true }),
     supabase.from('journal_entries').select('*').order('local_date', { ascending: true }),
@@ -95,6 +95,7 @@ export async function pullAll(fallbackName?: string) {
       .from('food_logs')
       .select('*')
       .gte('local_date', new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)),
+    supabase.from('favorite_foods').select('*').order('created_at', { ascending: true }),
     supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
   ]);
 
@@ -148,6 +149,17 @@ export async function pullAll(fallbackName?: string) {
     fatG: Math.round(Number(f.fat_g ?? 0)),
     entryMethod: f.entry_method ?? 'search',
   }));
+  const favoriteFoods: FavoriteFood[] = (favoritesQ.data ?? []).map((f) => ({
+    id: f.id,
+    name: f.name,
+    brand: f.brand ?? undefined,
+    servingDesc: f.serving_desc ?? undefined,
+    barcode: f.barcode ?? undefined,
+    calories: Math.round(Number(f.calories ?? 0)),
+    proteinG: Math.round(Number(f.protein_g ?? 0)),
+    carbsG: Math.round(Number(f.carbs_g ?? 0)),
+    fatG: Math.round(Number(f.fat_g ?? 0)),
+  }));
 
   const p = profileQ.data;
   const profile: Partial<Profile> = {};
@@ -167,7 +179,7 @@ export async function pullAll(fallbackName?: string) {
   }
   useAuth.setState({ needsOnboarding: !p?.onboarded_at });
 
-  useApp.getState().hydrateRemote({ runs, cross, journal, shoes, foodLogs, profile });
+  useApp.getState().hydrateRemote({ runs, cross, journal, shoes, foodLogs, favoriteFoods, profile });
 }
 
 /** Push profile/goal fields (snake_case columns) to the signed-in user's row. */
@@ -327,4 +339,32 @@ export function deleteFood(id: string) {
   useApp.getState().deleteFood(id);
   if (!userId()) return;
   supabase.from('food_logs').delete().eq('id', id).then(warnOnError('food delete'));
+}
+
+export function addFavoriteFood(input: Omit<FavoriteFood, 'id'>) {
+  const id = uuid();
+  useApp.getState().addFavoriteFood({ ...input, id });
+  const uid = userId();
+  if (!uid) return;
+  supabase
+    .from('favorite_foods')
+    .insert({
+      id,
+      user_id: uid,
+      name: input.name,
+      brand: input.brand ?? null,
+      serving_desc: input.servingDesc ?? null,
+      barcode: input.barcode ?? null,
+      calories: input.calories,
+      protein_g: input.proteinG,
+      carbs_g: input.carbsG,
+      fat_g: input.fatG,
+    })
+    .then(warnOnError('favorite food'));
+}
+
+export function removeFavoriteFood(id: string) {
+  useApp.getState().removeFavoriteFood(id);
+  if (!userId()) return;
+  supabase.from('favorite_foods').delete().eq('id', id).then(warnOnError('favorite food delete'));
 }

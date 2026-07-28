@@ -103,6 +103,11 @@ export interface FoodItem {
   fatG: number;
 }
 
+/** A saved food for one-tap re-logging of things eaten often. */
+export interface FavoriteFood extends FoodItem {
+  id: string;
+}
+
 export const MEAL_META: Record<Meal, { label: string; icon: string }> = {
   breakfast: { label: 'Breakfast', icon: 'sunny' },
   lunch: { label: 'Lunch', icon: 'partly-sunny' },

@@ -6,11 +6,24 @@ import type { FoodItem } from './types';
  */
 
 const OFF = 'https://world.openfoodfacts.org';
+// Open Food Facts' legacy cgi/search.pl is being retired and now fails with
+// 503s more often than not; search-a-licious is the maintained replacement
+// and also ranks generic foods (e.g. a plain "banana") above random branded
+// products the way the old endpoint didn't.
+const OFF_SEARCH = 'https://search.openfoodfacts.org';
 const UA = 'Stride/1.0 (running app)';
 
 function num(v: unknown): number {
   const n = typeof v === 'string' ? parseFloat(v) : (v as number);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** `brands` is a comma-separated string from the product endpoint, but an
+ *  array from search-a-licious. */
+function firstBrand(brands: unknown): string | undefined {
+  const s = Array.isArray(brands) ? brands[0] : typeof brands === 'string' ? brands.split(',')[0] : '';
+  const trimmed = s?.trim();
+  return trimmed || undefined;
 }
 
 // Prefer per-serving values; fall back to per-100g.
@@ -26,7 +39,7 @@ function normalize(product: Record<string, any>): FoodItem | null {
 
   return {
     name,
-    brand: product?.brands?.split(',')[0]?.trim() || undefined,
+    brand: firstBrand(product?.brands),
     servingDesc: perServing ? product?.serving_size || '1 serving' : '100 g',
     barcode: product?.code,
     calories: Math.round(kcal),
@@ -56,13 +69,13 @@ export async function searchFoods(query: string): Promise<FoodItem[]> {
   if (q.length < 2) return [];
   try {
     const res = await fetch(
-      `${OFF}/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=product_name,generic_name,brands,serving_size,code,nutriments`,
+      `${OFF_SEARCH}/search?q=${encodeURIComponent(q)}&page_size=20&fields=product_name,generic_name,brands,serving_size,code,nutriments`,
       { headers: { 'User-Agent': UA } }
     );
     if (!res.ok) return [];
     const data = await res.json();
     const items: FoodItem[] = [];
-    for (const p of data?.products ?? []) {
+    for (const p of data?.hits ?? []) {
       const item = normalize(p);
       if (item && item.calories > 0) items.push(item);
     }
