@@ -59,6 +59,8 @@ export const useApp = create<AppState>()(
         name: 'Runner',
         weeklyGoalMi: 35,
         raceGoal: 'Sub-19 5K · Oct 10',
+        goalReminder: 'off',
+        goalReminderMinute: 480,
         heightCm: 178,
         weightKg: 66,
         age: 19,

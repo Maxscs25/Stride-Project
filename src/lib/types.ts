@@ -115,10 +115,27 @@ export const MEAL_META: Record<Meal, { label: string; icon: string }> = {
   snack: { label: 'Snack', icon: 'nutrition' },
 };
 
+/** How often to resurface the personal goal as a notification. */
+export type GoalReminder = 'off' | 'daily' | 'every3' | 'weekly';
+
+export const GOAL_REMINDER_META: Record<GoalReminder, { label: string; days: number }> = {
+  off: { label: 'Off', days: 0 },
+  daily: { label: 'Every day', days: 1 },
+  every3: { label: 'Every 3 days', days: 3 },
+  weekly: { label: 'Weekly', days: 7 },
+};
+
 export interface Profile {
   name: string;
   weeklyGoalMi: number;
   raceGoal: string;
+  /** The personal "why" — e.g. "Top 10 at the state XC meet". */
+  personalGoal?: string;
+  /** Optional target date (YYYY-MM-DD) so the app can count down to it. */
+  personalGoalDate?: string;
+  goalReminder: GoalReminder;
+  /** Minutes past local midnight for the reminder (e.g. 480 = 8:00 AM). */
+  goalReminderMinute: number;
   heightCm: number;
   weightKg: number;
   age: number;

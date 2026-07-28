@@ -11,14 +11,19 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-/** Pure-JS month calendar. Selects a past-or-today date; future days disabled. */
+/**
+ * Pure-JS month calendar. Defaults to past-or-today (run logging); pass
+ * `minKey`/`maxKey` to shift the window — e.g. a future-only goal date.
+ */
 export function DatePicker({
   value,
   onChange,
+  minKey,
   maxKey = todayKey(),
 }: {
   value: string;
   onChange: (key: string) => void;
+  minKey?: string;
   maxKey?: string;
 }) {
   const { colors } = useTheme();
@@ -34,6 +39,8 @@ export function DatePicker({
   ];
 
   const canGoNext = new Date(view.y, view.m + 1, 1) <= parseKey(maxKey);
+  // Last day of the previous month must still be selectable to page back.
+  const canGoPrev = !minKey || new Date(view.y, view.m, 0) >= parseKey(minKey);
   const shift = (delta: number) =>
     setView(({ y, m }) => {
       const d = new Date(y, m + delta, 1);
@@ -51,7 +58,10 @@ export function DatePicker({
         marginBottom: 14,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-        <Pressable onPress={() => shift(-1)} hitSlop={10} style={{ padding: 4 }}>
+        <Pressable
+          onPress={() => canGoPrev && shift(-1)}
+          hitSlop={10}
+          style={{ padding: 4, opacity: canGoPrev ? 1 : 0.3 }}>
           <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
         </Pressable>
         <Text style={{ flex: 1, textAlign: 'center', color: colors.text, fontSize: 15, fontWeight: '800' }}>
@@ -80,7 +90,7 @@ export function DatePicker({
           if (day == null) return <View key={i} style={{ width: `${100 / 7}%`, height: 38 }} />;
           const key = dateKey(new Date(view.y, view.m, day));
           const selected = key === value;
-          const disabled = key > maxKey;
+          const disabled = key > maxKey || (!!minKey && key < minKey);
           return (
             <Pressable
               key={i}

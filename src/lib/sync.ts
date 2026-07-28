@@ -174,6 +174,12 @@ export async function pullAll(fallbackName?: string) {
     if (p.experience_level === 'new' || p.experience_level === 'regular' || p.experience_level === 'competitive') {
       profile.experience = p.experience_level;
     }
+    if (p.personal_goal) profile.personalGoal = p.personal_goal;
+    if (p.personal_goal_date) profile.personalGoalDate = p.personal_goal_date;
+    if (['off', 'daily', 'every3', 'weekly'].includes(p.goal_reminder)) {
+      profile.goalReminder = p.goal_reminder;
+    }
+    if (p.goal_reminder_minute != null) profile.goalReminderMinute = Number(p.goal_reminder_minute);
   } else if (fallbackName) {
     profile.name = fallbackName;
   }

@@ -99,6 +99,22 @@ export default function Profile() {
         </Card>
       )}
 
+      <Card
+        onPress={() => router.push('/goal')}
+        style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons name="flag" size={18} color={colors.accent} style={{ marginRight: 12 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
+            {profile.personalGoal?.trim() ? 'Your goal' : 'Set your goal'}
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={2}>
+            {profile.personalGoal?.trim() ||
+              'Add a personal goal and get reminders to keep it front of mind.'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Card>
+
       <Card>
         <Row label="Name" value={profile.name} />
         <Row label="Race goal" value={profile.raceGoal} />

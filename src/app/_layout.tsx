@@ -2,9 +2,11 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { syncGoalReminders } from '@/lib/goalReminders';
 import { initHealthKit } from '@/lib/healthkit';
 import { initPurchases } from '@/lib/purchases';
 import { startAuthSync } from '@/lib/sync';
+import { useApp } from '@/store';
 import { useTheme } from '@/theme';
 
 export default function RootLayout() {
@@ -13,6 +15,9 @@ export default function RootLayout() {
     startAuthSync();
     initHealthKit();
     initPurchases();
+    // Re-arm goal reminders each launch: the "every 3 days" cadence is a finite
+    // batch of dated notifications, so this tops it back up.
+    syncGoalReminders(useApp.getState().profile);
   }, []);
   const navTheme = {
     ...(dark ? DarkTheme : DefaultTheme),
@@ -37,6 +42,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" options={{ presentation: 'modal', gestureEnabled: false }} />
         <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
         <Stack.Screen name="form" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="goal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
         <Stack.Screen name="legal" options={{ presentation: 'modal' }} />
       </Stack>

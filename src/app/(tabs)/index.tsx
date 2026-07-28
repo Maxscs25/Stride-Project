@@ -7,6 +7,7 @@ import { ChecklistCard } from '@/components/ChecklistCard';
 import { InsightCard } from '@/components/InsightCard';
 import { Card, ProgressBar, Screen, SectionHeader, StatTile } from '@/components/ui';
 import { fmtLongDate, round1, todayKey, weekStartKey } from '@/lib/format';
+import { daysUntilGoal } from '@/lib/goalReminders';
 import { useInsights } from '@/lib/insights';
 import { buildInsight, shoeMiles, weeklyMiles } from '@/lib/load';
 import { currentStreak } from '@/lib/streaks';
@@ -85,6 +86,7 @@ export default function Today() {
           </View>
         </Card>
       ) : null}
+      <GoalCard />
       <InsightCard insight={insight} />
 
       <SectionHeader title="This Week" />
@@ -140,5 +142,55 @@ export default function Today() {
         onToggle={(key) => toggleItem(today, key)}
       />
     </Screen>
+  );
+}
+
+/** The runner's "why", kept at the top of the home screen on purpose. */
+function GoalCard() {
+  const { colors } = useTheme();
+  const profile = useApp((s) => s.profile);
+  const goal = profile.personalGoal?.trim();
+  const days = daysUntilGoal(profile);
+
+  if (!goal) {
+    return (
+      <Card
+        onPress={() => router.push('/goal')}
+        style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons name="flag-outline" size={18} color={colors.textMuted} style={{ marginRight: 10 }} />
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
+          Set your goal — the reason behind the training.
+        </Text>
+        <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      onPress={() => router.push('/goal')}
+      style={{ borderLeftWidth: 3, borderLeftColor: colors.accent }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+        <Ionicons name="flag" size={13} color={colors.accent} style={{ marginRight: 6 }} />
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 11,
+            fontWeight: '800',
+            letterSpacing: 0.8,
+            flex: 1,
+          }}>
+          YOUR GOAL
+        </Text>
+        {days != null ? (
+          <Text style={{ color: colors.accent, fontSize: 12, fontWeight: '800' }}>
+            {days === 0 ? 'Today' : `${days} day${days === 1 ? '' : 's'}`}
+          </Text>
+        ) : null}
+      </View>
+      <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700', lineHeight: 22 }}>
+        {goal}
+      </Text>
+    </Card>
   );
 }
