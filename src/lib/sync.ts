@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
 import { round1, uuid } from './format';
+import { syncGoalReminders } from './goalReminders';
 import { clearInsights, fetchLatestInsight } from './insights';
 import { loginPurchases, logoutPurchases } from './purchases';
 import { checkStrava, clearStrava } from './strava';
@@ -51,6 +52,9 @@ export function startAuthSync() {
       clearSymptoms();
       logoutPurchases();
       useApp.getState().resetDemo();
+      // Cancels the outgoing account's reminders; demo mode has no goal to
+      // remind about (resetDemo() already reset goalReminder to 'off').
+      syncGoalReminders(useApp.getState().profile);
     }
   });
 }
@@ -71,6 +75,10 @@ async function bootstrap(session: Session) {
       checkStrava(),
       checkTerra(),
       fetchSymptomPatterns(),
+      // Re-arm with THIS account's goal — otherwise switching accounts
+      // without a cold app launch keeps the previous account's reminders
+      // (with its goal text) scheduled until the app next restarts.
+      syncGoalReminders(useApp.getState().profile),
     ]);
   } catch (e) {
     console.warn('sync bootstrap failed', e);
@@ -174,12 +182,16 @@ export async function pullAll(fallbackName?: string) {
     if (p.experience_level === 'new' || p.experience_level === 'regular' || p.experience_level === 'competitive') {
       profile.experience = p.experience_level;
     }
-    if (p.personal_goal) profile.personalGoal = p.personal_goal;
-    if (p.personal_goal_date) profile.personalGoalDate = p.personal_goal_date;
-    if (['off', 'daily', 'every3', 'weekly'].includes(p.goal_reminder)) {
-      profile.goalReminder = p.goal_reminder;
-    }
-    if (p.goal_reminder_minute != null) profile.goalReminderMinute = Number(p.goal_reminder_minute);
+    // Assigned unconditionally (unlike the fields above): these must always
+    // overwrite on hydrate, even when absent from this account's row, or
+    // switching accounts on the same device leaks the previous account's
+    // goal into the merge in hydrateRemote().
+    profile.personalGoal = p.personal_goal || undefined;
+    profile.personalGoalDate = p.personal_goal_date || undefined;
+    profile.goalReminder = ['off', 'daily', 'every3', 'weekly'].includes(p.goal_reminder)
+      ? p.goal_reminder
+      : 'off';
+    profile.goalReminderMinute = p.goal_reminder_minute != null ? Number(p.goal_reminder_minute) : 480;
   } else if (fallbackName) {
     profile.name = fallbackName;
   }

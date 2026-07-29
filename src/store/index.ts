@@ -50,22 +50,27 @@ interface AppState extends SeedData {
 
 const seed = buildSeed();
 
+// Shared by the initial state and resetDemo() so signing out actually clears
+// a previous account's profile — not just its runs/journal/etc — rather than
+// leaving another account's name and goal visible in demo mode.
+const DEFAULT_PROFILE: Profile = {
+  name: 'Runner',
+  weeklyGoalMi: 35,
+  raceGoal: 'Sub-19 5K · Oct 10',
+  goalReminder: 'off',
+  goalReminderMinute: 480,
+  heightCm: 178,
+  weightKg: 66,
+  age: 19,
+  sex: 'male',
+};
+
 export const useApp = create<AppState>()(
   persist(
     (set) => ({
       ...seed,
       demoMode: true,
-      profile: {
-        name: 'Runner',
-        weeklyGoalMi: 35,
-        raceGoal: 'Sub-19 5K · Oct 10',
-        goalReminder: 'off',
-        goalReminderMinute: 480,
-        heightCm: 178,
-        weightKg: 66,
-        age: 19,
-        sex: 'male',
-      },
+      profile: DEFAULT_PROFILE,
 
       logRun: (r) =>
         set((s) => ({
@@ -154,7 +159,7 @@ export const useApp = create<AppState>()(
           };
         }),
 
-      resetDemo: () => set({ ...buildSeed(), demoMode: true }),
+      resetDemo: () => set({ ...buildSeed(), demoMode: true, profile: DEFAULT_PROFILE }),
     }),
     {
       name: 'stride-store',
