@@ -56,6 +56,9 @@ EVERYTHING ELSE
 Free forever for logging. Stride Premium unlocks the full AI coach, nutrition, and form analysis.
 
 Stride is for educational and training purposes only and is not a medical device.
+
+Terms of Use: https://maxscs25.github.io/Stride-Project/terms.html
+Privacy Policy: https://maxscs25.github.io/Stride-Project/privacy.html
 ```
 
 **What's New** (first release)
