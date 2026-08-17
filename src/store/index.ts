@@ -9,6 +9,7 @@ import type {
   FavoriteFood,
   FoodLog,
   JournalEntry,
+  PendingWrite,
   Profile,
   Run,
   Shoe,
@@ -30,6 +31,10 @@ interface AppState extends SeedData {
   profile: Profile;
   /** True while showing generated sample data (signed out). */
   demoMode: boolean;
+  /** Writes not yet confirmed on the server; replayed on the next sign-in. */
+  pending: PendingWrite[];
+  queueWrite: (w: PendingWrite) => void;
+  clearPending: (ids: string[]) => void;
   logRun: (r: WithOptionalId<Run>) => void;
   logCross: (c: WithOptionalId<CrossSession>) => void;
   addJournal: (j: WithOptionalId<JournalEntry>) => void;
@@ -49,6 +54,26 @@ interface AppState extends SeedData {
 }
 
 const seed = buildSeed();
+
+/**
+ * Merge server rows with local rows that are still queued for upload.
+ *
+ * A pull used to replace each list outright, so anything logged while offline
+ * or signed out was silently destroyed the moment the app re-synced. Only rows
+ * present in `pending` are carried over — seeded demo data is never queued, so
+ * it can't leak into a real account.
+ */
+function keepPending<T extends { id: string }>(
+  server: T[],
+  local: T[],
+  table: PendingWrite['table'],
+  pending: PendingWrite[]
+): T[] {
+  const queued = new Set(pending.filter((p) => p.table === table).map((p) => p.id));
+  if (queued.size === 0) return server;
+  const onServer = new Set(server.map((r) => r.id));
+  return [...server, ...local.filter((r) => queued.has(r.id) && !onServer.has(r.id))];
+}
 
 // Shared by the initial state and resetDemo() so signing out actually clears
 // a previous account's profile — not just its runs/journal/etc — rather than
@@ -71,6 +96,13 @@ export const useApp = create<AppState>()(
       ...seed,
       demoMode: true,
       profile: DEFAULT_PROFILE,
+      pending: [],
+
+      queueWrite: (w) =>
+        set((s) => ({ pending: [...s.pending.filter((p) => p.id !== w.id), w] })),
+
+      clearPending: (ids) =>
+        set((s) => ({ pending: s.pending.filter((p) => !ids.includes(p.id)) })),
 
       logRun: (r) =>
         set((s) => ({
@@ -137,20 +169,23 @@ export const useApp = create<AppState>()(
 
       hydrateRemote: (d) =>
         set((s) => {
+          const p = s.pending;
+          const runs = keepPending(d.runs, s.runs, 'runs', p);
+          const journal = keepPending(d.journal, s.journal, 'journal_entries', p);
           // Demo-only artifacts don't carry into a real account; auto-tracked
           // checklist items are re-derived from the pulled data.
           const completions = s.demoMode ? {} : { ...s.completions };
-          for (const r of d.runs)
+          for (const r of runs)
             completions[r.date] = { ...(completions[r.date] ?? {}), run: true };
-          for (const j of d.journal)
+          for (const j of journal)
             completions[j.date] = { ...(completions[j.date] ?? {}), journal: true };
           return {
-            runs: d.runs,
-            cross: d.cross,
-            journal: d.journal,
-            shoes: d.shoes,
-            foodLogs: d.foodLogs,
-            favoriteFoods: d.favoriteFoods,
+            runs,
+            cross: keepPending(d.cross, s.cross, 'cross_training', p),
+            journal,
+            shoes: keepPending(d.shoes, s.shoes, 'shoes', p),
+            foodLogs: keepPending(d.foodLogs, s.foodLogs, 'food_logs', p),
+            favoriteFoods: keepPending(d.favoriteFoods, s.favoriteFoods, 'favorite_foods', p),
             completions,
             hydration: s.demoMode ? {} : s.hydration,
             prs: s.demoMode ? [] : s.prs,
@@ -159,7 +194,11 @@ export const useApp = create<AppState>()(
           };
         }),
 
-      resetDemo: () => set({ ...buildSeed(), demoMode: true, profile: DEFAULT_PROFILE }),
+      // Only reached on an *explicit* sign-out (sync.ts flushes pending writes
+      // first). Clearing the queue here stops one account's unsynced rows from
+      // being replayed into whichever account signs in next.
+      resetDemo: () =>
+        set({ ...buildSeed(), demoMode: true, profile: DEFAULT_PROFILE, pending: [] }),
     }),
     {
       name: 'stride-store',

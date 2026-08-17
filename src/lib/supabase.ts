@@ -2,6 +2,7 @@ import 'react-native-url-polyfill/auto';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { AppState, Platform } from 'react-native';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -26,3 +27,20 @@ export const supabase = createClient(url, key, {
     detectSessionInUrl: false,
   },
 });
+
+/**
+ * Drive token refresh from app foreground/background.
+ *
+ * On native, `autoRefreshToken` alone is NOT enough: it runs on a timer, and
+ * iOS suspends timers for backgrounded apps. Come back after the access token
+ * has expired and the refresh never fired — the session dies and Supabase
+ * emits SIGNED_OUT, silently logging the user out mid-use. Supabase documents
+ * startAutoRefresh/stopAutoRefresh as the required React Native pairing.
+ */
+if (!isServer && Platform.OS !== 'web') {
+  supabase.auth.startAutoRefresh();
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') supabase.auth.startAutoRefresh();
+    else supabase.auth.stopAutoRefresh();
+  });
+}

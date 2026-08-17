@@ -56,6 +56,8 @@ export default function Today() {
 
   const { session, ready } = useAuth();
   const needsOnboarding = useAuth((s) => s.needsOnboarding);
+  const sessionLost = useAuth((s) => s.sessionLost);
+  const pendingCount = useApp((s) => s.pending.length);
 
   useEffect(() => {
     if (needsOnboarding && session) {
@@ -69,19 +71,27 @@ export default function Today() {
       {ready && !session ? (
         <Card
           onPress={() => router.push('/auth')}
-          style={{ flexDirection: 'row', alignItems: 'center' }}>
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            ...(sessionLost ? { borderLeftWidth: 3, borderLeftColor: colors.warn } : {}),
+          }}>
           <Ionicons
-            name="cloud-upload"
+            name={sessionLost ? 'cloud-offline' : 'cloud-upload'}
             size={20}
-            color={colors.accent}
+            color={sessionLost ? colors.warn : colors.accent}
             style={{ marginRight: 12 }}
           />
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
-              You're looking at demo data
+              {sessionLost ? 'Signed out — nothing lost' : "You're looking at demo data"}
             </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-              Create a free account to start your real training log →
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2, lineHeight: 17 }}>
+              {sessionLost
+                ? `Your training is safe on this device${
+                    pendingCount ? ` (${pendingCount} waiting to sync)` : ''
+                  }. Sign back in to resume syncing →`
+                : 'Create a free account to start your real training log →'}
             </Text>
           </View>
         </Card>

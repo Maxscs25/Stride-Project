@@ -9,7 +9,16 @@ import { checkStrava, clearStrava } from './strava';
 import { clearSymptoms, fetchSymptomPatterns } from './symptoms';
 import { checkTerra, clearTerra } from './terra';
 import { supabase } from './supabase';
-import type { CrossSession, FavoriteFood, FoodLog, JournalEntry, Profile, Run, Shoe } from './types';
+import type {
+  CrossSession,
+  FavoriteFood,
+  FoodLog,
+  JournalEntry,
+  PendingWrite,
+  Profile,
+  Run,
+  Shoe,
+} from './types';
 import { useApp } from '@/store';
 
 /**
@@ -23,14 +32,34 @@ export const useAuth = create<{
   session: Session | null;
   ready: boolean;
   needsOnboarding: boolean;
+  /** Session dropped without the user asking — their data is intact locally
+   *  and queued, but nothing will sync until they sign back in. */
+  sessionLost: boolean;
+  /** Last write failure, surfaced in the UI instead of only the console. */
+  syncError: string | null;
 }>(() => ({
   session: null,
   ready: false,
   needsOnboarding: false,
+  sessionLost: false,
+  syncError: null,
 }));
 
 let started = false;
 let pulling = false;
+/** Set only by signOut(), so an expired session isn't mistaken for intent. */
+let userInitiatedSignOut = false;
+
+/** Sign out deliberately — pushes anything queued first so it isn't discarded. */
+export async function signOut() {
+  try {
+    await flushPending();
+  } catch {
+    // Best effort: never block sign-out on a failed flush.
+  }
+  userInitiatedSignOut = true;
+  await supabase.auth.signOut();
+}
 
 export function startAuthSync() {
   if (started) return;
@@ -51,10 +80,20 @@ export function startAuthSync() {
       clearTerra();
       clearSymptoms();
       logoutPurchases();
-      useApp.getState().resetDemo();
-      // Cancels the outgoing account's reminders; demo mode has no goal to
-      // remind about (resetDemo() already reset goalReminder to 'off').
-      syncGoalReminders(useApp.getState().profile);
+
+      if (userInitiatedSignOut) {
+        userInitiatedSignOut = false;
+        useAuth.setState({ sessionLost: false, syncError: null });
+        useApp.getState().resetDemo();
+        // Cancels the outgoing account's reminders; demo mode has no goal to
+        // remind about (resetDemo() already reset goalReminder to 'off').
+        syncGoalReminders(useApp.getState().profile);
+      } else {
+        // Session expired or was revoked — the user didn't ask for this.
+        // Wiping to demo data here is what made runs vanish and goals reset,
+        // so keep everything and let them sign back in to resume syncing.
+        useAuth.setState({ sessionLost: true });
+      }
     }
   });
 }
@@ -69,6 +108,10 @@ async function bootstrap(session: Session) {
     await supabase
       .from('profiles')
       .upsert({ id: uid, display_name: name }, { ignoreDuplicates: true });
+    // Push anything logged while offline or signed out BEFORE pulling, so the
+    // pull returns it and local/remote agree.
+    await flushPending();
+    useAuth.setState({ sessionLost: false });
     await pullAll(name);
     await Promise.all([
       fetchLatestInsight(),
@@ -213,10 +256,57 @@ function userId(): string | null {
   return useAuth.getState().session?.user.id ?? null;
 }
 
-function warnOnError(label: string) {
-  return ({ error }: { error: { message: string } | null }) => {
-    if (error) console.warn(`${label} sync failed:`, error.message);
-  };
+/**
+ * Write a row to Supabase, queueing it locally if that isn't possible.
+ *
+ * Previously these were fire-and-forget with a console.warn — a failed insert
+ * was invisible, and the next pull would wipe the local row, so logged runs
+ * just disappeared. Now every failure (and every write made while signed out)
+ * is queued and replayed by flushPending().
+ */
+function push(
+  table: PendingWrite['table'],
+  id: string,
+  row: Record<string, unknown>,
+  label: string
+) {
+  const queue = () =>
+    useApp.getState().queueWrite({ id, table, row, queuedAt: new Date().toISOString() });
+
+  const uid = userId();
+  if (!uid) {
+    queue();
+    return;
+  }
+  supabase
+    .from(table)
+    .insert({ ...row, id, user_id: uid })
+    .then(({ error }) => {
+      if (!error) return;
+      console.warn(`${label} sync failed:`, error.message);
+      queue();
+      useAuth.setState({
+        syncError: `Your ${label} is saved on this device but hasn't reached the cloud yet — it'll sync automatically.`,
+      });
+    });
+}
+
+/** Replay queued writes. Upsert keyed on id, so replaying is idempotent. */
+export async function flushPending(): Promise<number> {
+  const uid = userId();
+  if (!uid) return 0;
+  const queue = useApp.getState().pending;
+  if (queue.length === 0) return 0;
+
+  const synced: string[] = [];
+  for (const w of queue) {
+    const { error } = await supabase.from(w.table).upsert({ ...w.row, id: w.id, user_id: uid });
+    if (error) console.warn(`flush ${w.table} ${w.id} failed:`, error.message);
+    else synced.push(w.id);
+  }
+  if (synced.length) useApp.getState().clearPending(synced);
+  if (synced.length === queue.length) useAuth.setState({ syncError: null });
+  return synced.length;
 }
 
 /** Log a run locally + push. A run note also becomes a journal entry so the
@@ -229,32 +319,24 @@ export function logRun(input: Omit<Run, 'id'>) {
     useApp.getState().addJournal({ date: input.date, note: input.note, id: jid });
   }
 
-  const uid = userId();
-  if (!uid) return;
-  supabase
-    .from('runs')
-    .insert({
-      id,
-      user_id: uid,
-      started_at: `${input.date}T12:00:00Z`,
-      local_date: input.date,
-      distance_m: Math.round(input.distanceMi * M_PER_MI),
-      duration_s: input.durationS,
-      workout_type: input.type,
-      shoe_id: input.shoeId ?? null,
-      rpe: input.rpe ?? null,
-      source: 'manual',
-    })
-    .then(warnOnError('run'));
+  push('runs', id, {
+    started_at: `${input.date}T12:00:00Z`,
+    local_date: input.date,
+    distance_m: Math.round(input.distanceMi * M_PER_MI),
+    duration_s: input.durationS,
+    workout_type: input.type,
+    shoe_id: input.shoeId ?? null,
+    rpe: input.rpe ?? null,
+    source: 'manual',
+  }, 'run');
+
   if (input.note) {
-    const note = input.note;
-    supabase
-      .from('journal_entries')
-      .insert({ id: jid, user_id: uid, local_date: input.date, run_id: id, body: note })
-      .then((r) => {
-        warnOnError('run note')(r);
-        if (!r.error) extractSymptoms(jid, note);
-      });
+    push('journal_entries', jid, {
+      local_date: input.date,
+      run_id: id,
+      body: input.note,
+    }, 'run note');
+    if (userId()) extractSymptoms(jid, input.note);
   }
 }
 
@@ -270,119 +352,97 @@ function extractSymptoms(journalEntryId: string, note: string) {
 export function logCross(input: Omit<CrossSession, 'id'>) {
   const id = uuid();
   useApp.getState().logCross({ ...input, id });
-  const uid = userId();
-  if (!uid) return;
-  supabase
-    .from('cross_training')
-    .insert({
-      id,
-      user_id: uid,
-      local_date: input.date,
-      activity_type: input.activity,
-      duration_min: input.minutes,
-      intensity: input.intensity ?? null,
-      notes: input.note ?? null,
-    })
-    .then(warnOnError('cross-training'));
+  push('cross_training', id, {
+    local_date: input.date,
+    activity_type: input.activity,
+    duration_min: input.minutes,
+    intensity: input.intensity ?? null,
+    notes: input.note ?? null,
+  }, 'cross-training');
 }
 
 export function addJournal(input: Omit<JournalEntry, 'id'>) {
   const id = uuid();
   useApp.getState().addJournal({ ...input, id });
-  const uid = userId();
-  if (!uid) return;
-  supabase
-    .from('journal_entries')
-    .insert({
-      id,
-      user_id: uid,
-      local_date: input.date,
-      body: input.note ?? null,
-      energy: input.energy ?? null,
-      soreness: input.soreness ?? null,
-      stress: input.stress ?? null,
-      sleep_hours: input.sleepHours ?? null,
-      sleep_quality: input.sleepQuality ?? null,
-    })
-    .then((r) => {
-      warnOnError('journal')(r);
-      if (!r.error && input.note) extractSymptoms(id, input.note);
-    });
+  push('journal_entries', id, {
+    local_date: input.date,
+    body: input.note ?? null,
+    energy: input.energy ?? null,
+    soreness: input.soreness ?? null,
+    stress: input.stress ?? null,
+    sleep_hours: input.sleepHours ?? null,
+    sleep_quality: input.sleepQuality ?? null,
+  }, 'journal');
+  if (input.note && userId()) extractSymptoms(id, input.note);
 }
 
 export function addShoe(input: Omit<Shoe, 'id'>) {
   const id = uuid();
   useApp.getState().addShoe({ ...input, id });
-  const uid = userId();
-  if (!uid) return;
-  supabase
-    .from('shoes')
-    .insert({
-      id,
-      user_id: uid,
-      brand: input.brand,
-      model: input.model,
-      lifespan_miles: input.lifespanMiles,
-      starting_miles: input.startingMiles,
-      color: input.color,
-      is_default: input.isDefault ?? false,
-    })
-    .then(warnOnError('shoe'));
+  push('shoes', id, {
+    brand: input.brand,
+    model: input.model,
+    lifespan_miles: input.lifespanMiles,
+    starting_miles: input.startingMiles,
+    color: input.color,
+    is_default: input.isDefault ?? false,
+  }, 'shoe');
 }
 
 export function logFood(input: Omit<FoodLog, 'id'>) {
   const id = uuid();
   useApp.getState().logFood({ ...input, id });
-  const uid = userId();
-  if (!uid) return;
-  supabase
-    .from('food_logs')
-    .insert({
-      id,
-      user_id: uid,
-      local_date: input.date,
-      meal: input.meal,
-      custom_name: input.name.slice(0, 120),
-      servings: input.servings,
-      calories: input.calories,
-      protein_g: input.proteinG,
-      carbs_g: input.carbsG,
-      fat_g: input.fatG,
-      entry_method: input.entryMethod,
-    })
-    .then(warnOnError('food'));
+  push('food_logs', id, {
+    local_date: input.date,
+    meal: input.meal,
+    custom_name: input.name.slice(0, 120),
+    servings: input.servings,
+    calories: input.calories,
+    protein_g: input.proteinG,
+    carbs_g: input.carbsG,
+    fat_g: input.fatG,
+    entry_method: input.entryMethod,
+  }, 'food');
 }
 
 export function deleteFood(id: string) {
   useApp.getState().deleteFood(id);
+  // Drop it from the queue too, or a later flush would resurrect it.
+  useApp.getState().clearPending([id]);
   if (!userId()) return;
-  supabase.from('food_logs').delete().eq('id', id).then(warnOnError('food delete'));
+  supabase
+    .from('food_logs')
+    .delete()
+    .eq('id', id)
+    .then(({ error }) => {
+      if (error) console.warn('food delete sync failed:', error.message);
+    });
 }
 
 export function addFavoriteFood(input: Omit<FavoriteFood, 'id'>) {
   const id = uuid();
   useApp.getState().addFavoriteFood({ ...input, id });
-  const uid = userId();
-  if (!uid) return;
-  supabase
-    .from('favorite_foods')
-    .insert({
-      id,
-      user_id: uid,
-      name: input.name,
-      brand: input.brand ?? null,
-      serving_desc: input.servingDesc ?? null,
-      barcode: input.barcode ?? null,
-      calories: input.calories,
-      protein_g: input.proteinG,
-      carbs_g: input.carbsG,
-      fat_g: input.fatG,
-    })
-    .then(warnOnError('favorite food'));
+  push('favorite_foods', id, {
+    name: input.name,
+    brand: input.brand ?? null,
+    serving_desc: input.servingDesc ?? null,
+    barcode: input.barcode ?? null,
+    calories: input.calories,
+    protein_g: input.proteinG,
+    carbs_g: input.carbsG,
+    fat_g: input.fatG,
+  }, 'favorite food');
 }
 
 export function removeFavoriteFood(id: string) {
   useApp.getState().removeFavoriteFood(id);
+  useApp.getState().clearPending([id]);
   if (!userId()) return;
-  supabase.from('favorite_foods').delete().eq('id', id).then(warnOnError('favorite food delete'));
+  supabase
+    .from('favorite_foods')
+    .delete()
+    .eq('id', id)
+    .then(({ error }) => {
+      if (error) console.warn('favorite food delete sync failed:', error.message);
+    });
 }

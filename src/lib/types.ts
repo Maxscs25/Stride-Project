@@ -108,6 +108,20 @@ export interface FavoriteFood extends FoodItem {
   id: string;
 }
 
+/**
+ * A local write that hasn't been confirmed on the server yet — queued when the
+ * user is signed out, offline, or the insert failed. Persisted with the store
+ * so it survives app restarts, replayed by flushPending() on the next sign-in.
+ */
+export interface PendingWrite {
+  /** The row id, so a replay is idempotent and can be matched to local state. */
+  id: string;
+  table: 'runs' | 'cross_training' | 'journal_entries' | 'shoes' | 'food_logs' | 'favorite_foods';
+  /** Insert payload without user_id — that's stamped at flush time. */
+  row: Record<string, unknown>;
+  queuedAt: string;
+}
+
 export const MEAL_META: Record<Meal, { label: string; icon: string }> = {
   breakfast: { label: 'Breakfast', icon: 'sunny' },
   lunch: { label: 'Lunch', icon: 'partly-sunny' },

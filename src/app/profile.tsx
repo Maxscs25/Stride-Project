@@ -10,7 +10,7 @@ import { connectHealthKit, syncHealthKitRuns, useHealthKit } from '@/lib/healthk
 import { useIsPremium } from '@/lib/purchases';
 import { checkStrava, connectStrava, disconnectStrava, useStrava } from '@/lib/strava';
 import { supabase } from '@/lib/supabase';
-import { pullAll, updateProfileRemote, useAuth } from '@/lib/sync';
+import { pullAll, signOut, updateProfileRemote, useAuth } from '@/lib/sync';
 import { checkTerra, connectTerra, disconnectTerra, useTerra } from '@/lib/terra';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
@@ -78,7 +78,9 @@ export default function Profile() {
           <Row label="Signed in as" value={session.user.email ?? '—'} />
           <Pressable
             onPress={() => {
-              supabase.auth.signOut();
+              // Flushes queued writes first, and marks this as intentional so
+              // the handler clears local data (an expired session must not).
+              signOut();
               router.back();
             }}
             style={{ paddingVertical: 10 }}>
