@@ -1,12 +1,13 @@
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { DatePicker } from '@/components/DatePicker';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
 import { addDays, fmtLongDate, fmtPace, todayKey } from '@/lib/format';
 import { shoeMiles } from '@/lib/load';
-import { logRun } from '@/lib/sync';
+import { deleteRun, logRun, updateRun } from '@/lib/sync';
 import { WORKOUT_META, type WorkoutType } from '@/lib/types';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
@@ -17,17 +18,22 @@ export default function LogRun() {
   const { colors } = useTheme();
   const shoes = useApp((s) => s.shoes);
   const runs = useApp((s) => s.runs);
+  // Same form serves both jobs: with an `id` it edits that run instead.
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const editing = runs.find((r) => r.id === id);
 
-  const [date, setDate] = useState(todayKey());
+  const [date, setDate] = useState(editing?.date ?? todayKey());
   const [showCal, setShowCal] = useState(false);
-  const [distance, setDistance] = useState('');
-  const [minutes, setMinutes] = useState('');
-  const [type, setType] = useState<WorkoutType>('easy');
-  const [shoeId, setShoeId] = useState<string | undefined>(
-    shoes.find((s) => s.isDefault && !s.retiredAt)?.id ?? shoes[0]?.id
+  const [distance, setDistance] = useState(editing ? String(editing.distanceMi) : '');
+  const [minutes, setMinutes] = useState(
+    editing ? String(Math.round((editing.durationS / 60) * 100) / 100) : ''
   );
-  const [rpe, setRpe] = useState<number | undefined>();
-  const [note, setNote] = useState('');
+  const [type, setType] = useState<WorkoutType>(editing?.type ?? 'easy');
+  const [shoeId, setShoeId] = useState<string | undefined>(
+    editing?.shoeId ?? shoes.find((s) => s.isDefault && !s.retiredAt)?.id ?? shoes[0]?.id
+  );
+  const [rpe, setRpe] = useState<number | undefined>(editing?.rpe);
+  const [note, setNote] = useState(editing?.note ?? '');
 
   const mi = parseFloat(distance);
   const min = parseFloat(minutes);
@@ -36,6 +42,11 @@ export default function LogRun() {
 
   const save = () => {
     if (!valid) return;
+    if (editing) {
+      updateRun({ ...editing, date, distanceMi: mi, durationS, type, shoeId, rpe });
+      router.back();
+      return;
+    }
     logRun({
       date,
       distanceMi: mi,
@@ -48,10 +59,25 @@ export default function LogRun() {
     finishLogging();
   };
 
+  const confirmDelete = () => {
+    if (!editing) return;
+    Alert.alert('Delete this run?', 'It will be removed from your log and shoe mileage.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteRun(editing.id);
+          router.back();
+        },
+      },
+    ]);
+  };
+
   const yesterday = addDays(todayKey(), -1);
 
   return (
-    <ModalShell title="Log a Run">
+    <ModalShell title={editing ? 'Edit Run' : 'Log a Run'}>
       <Label text="When" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
         <Chip
@@ -152,16 +178,25 @@ export default function LogRun() {
       />
 
       <View style={{ height: 14 }} />
-      <Field
-        label="Notes (optional)"
-        value={note}
-        onChangeText={setNote}
-        placeholder="How did it feel? Any niggles?"
-        multiline
-        numberOfLines={3}
-        maxLength={4000}
-        style={{ minHeight: 80, textAlignVertical: 'top' }}
-      />
+      {editing ? (
+        // A run's note is stored as its own journal entry, so it's edited from
+        // the journal — showing a field here that silently discarded edits
+        // would be worse than not showing one.
+        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 14 }}>
+          Notes are kept with your journal entry for this day and can be edited there.
+        </Text>
+      ) : (
+        <Field
+          label="Notes (optional)"
+          value={note}
+          onChangeText={setNote}
+          placeholder="How did it feel? Any niggles?"
+          multiline
+          numberOfLines={3}
+          maxLength={4000}
+          style={{ minHeight: 80, textAlignVertical: 'top' }}
+        />
+      )}
 
       <Pressable
         onPress={save}
@@ -179,9 +214,17 @@ export default function LogRun() {
             fontSize: 16,
             fontWeight: '800',
           }}>
-          Save Run
+          {editing ? 'Save Changes' : 'Save Run'}
         </Text>
       </Pressable>
+
+      {editing ? (
+        <Pressable onPress={confirmDelete} style={{ alignItems: 'center', paddingVertical: 16 }}>
+          <Text style={{ color: colors.danger, fontSize: 14, fontWeight: '700' }}>
+            Delete this run
+          </Text>
+        </Pressable>
+      ) : null}
     </ModalShell>
   );
 }

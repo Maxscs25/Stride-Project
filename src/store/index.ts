@@ -36,6 +36,10 @@ interface AppState extends SeedData {
   queueWrite: (w: PendingWrite) => void;
   clearPending: (ids: string[]) => void;
   logRun: (r: WithOptionalId<Run>) => void;
+  updateRun: (r: Run) => void;
+  deleteRun: (id: string) => void;
+  updateShoe: (s: Shoe) => void;
+  deleteShoe: (id: string) => void;
   logCross: (c: WithOptionalId<CrossSession>) => void;
   addJournal: (j: WithOptionalId<JournalEntry>) => void;
   addShoe: (s: WithOptionalId<Shoe>) => void;
@@ -63,6 +67,27 @@ const seed = buildSeed();
  * present in `pending` are carried over — seeded demo data is never queued, so
  * it can't leak into a real account.
  */
+/**
+ * Re-derive the auto-ticked "run" checklist item from the runs that actually
+ * exist. Editing a run's date or deleting it must not leave a tick behind on a
+ * day with no run; manually-toggled items are left alone.
+ */
+function recomputeRunTicks(
+  completions: Record<string, Record<string, boolean>>,
+  runs: Run[]
+): Record<string, Record<string, boolean>> {
+  const days = new Set(runs.map((r) => r.date));
+  const next: Record<string, Record<string, boolean>> = {};
+  for (const [date, items] of Object.entries(completions)) {
+    const { run: _run, ...rest } = items;
+    next[date] = days.has(date) ? { ...rest, run: true } : rest;
+  }
+  for (const date of days) {
+    if (!next[date]) next[date] = { run: true };
+  }
+  return next;
+}
+
 function keepPending<T extends { id: string }>(
   server: T[],
   local: T[],
@@ -111,6 +136,31 @@ export const useApp = create<AppState>()(
             ...s.completions,
             [r.date]: { ...(s.completions[r.date] ?? {}), run: true },
           },
+        })),
+
+      updateRun: (run) =>
+        set((s) => {
+          const runs = s.runs.map((r) => (r.id === run.id ? run : r));
+          // Moving a run to another day can leave the old day's auto-ticked
+          // "run" checklist item set with nothing behind it.
+          return { runs, completions: recomputeRunTicks(s.completions, runs) };
+        }),
+
+      deleteRun: (id) =>
+        set((s) => {
+          const runs = s.runs.filter((r) => r.id !== id);
+          return { runs, completions: recomputeRunTicks(s.completions, runs) };
+        }),
+
+      updateShoe: (shoe) =>
+        set((s) => ({ shoes: s.shoes.map((x) => (x.id === shoe.id ? shoe : x)) })),
+
+      // Runs keep their shoeId; shoeMiles() just stops matching, and the DB
+      // mirrors this with `shoe_id ... on delete set null`.
+      deleteShoe: (id) =>
+        set((s) => ({
+          shoes: s.shoes.filter((x) => x.id !== id),
+          runs: s.runs.map((r) => (r.shoeId === id ? { ...r, shoeId: undefined } : r)),
         })),
 
       logCross: (c) =>

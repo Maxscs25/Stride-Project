@@ -268,30 +268,62 @@ function push(
   table: PendingWrite['table'],
   id: string,
   row: Record<string, unknown>,
-  label: string
+  label: string,
+  op: PendingWrite['op'] = 'insert'
 ) {
   const queue = () =>
-    useApp.getState().queueWrite({ id, table, row, queuedAt: new Date().toISOString() });
+    useApp.getState().queueWrite({ id, table, op, row, queuedAt: new Date().toISOString() });
 
   const uid = userId();
   if (!uid) {
     queue();
     return;
   }
-  supabase
-    .from(table)
-    .insert({ ...row, id, user_id: uid })
-    .then(({ error }) => {
-      if (!error) return;
-      console.warn(`${label} sync failed:`, error.message);
-      queue();
-      useAuth.setState({
-        syncError: `Your ${label} is saved on this device but hasn't reached the cloud yet — it'll sync automatically.`,
-      });
+  runWrite(table, id, op, row, uid).then(({ error }) => {
+    if (!error) return;
+    console.warn(`${label} sync failed:`, error.message);
+    queue();
+    useAuth.setState({
+      syncError: `Your ${label} is saved on this device but hasn't reached the cloud yet — it'll sync automatically.`,
     });
+  });
 }
 
-/** Replay queued writes. Upsert keyed on id, so replaying is idempotent. */
+/** Remove a row locally and remotely, queueing the delete if it can't happen now. */
+function pushDelete(table: PendingWrite['table'], id: string, label: string) {
+  // Drop any queued insert/update for this row — replaying it would resurrect it.
+  useApp.getState().clearPending([id]);
+  const uid = userId();
+  if (!uid) {
+    useApp
+      .getState()
+      .queueWrite({ id, table, op: 'delete', queuedAt: new Date().toISOString() });
+    return;
+  }
+  runWrite(table, id, 'delete', undefined, uid).then(({ error }) => {
+    if (!error) return;
+    console.warn(`${label} delete sync failed:`, error.message);
+    useApp
+      .getState()
+      .queueWrite({ id, table, op: 'delete', queuedAt: new Date().toISOString() });
+  });
+}
+
+function runWrite(
+  table: PendingWrite['table'],
+  id: string,
+  op: PendingWrite['op'],
+  row: Record<string, unknown> | undefined,
+  uid: string
+): PromiseLike<{ error: { message: string } | null }> {
+  if (op === 'delete') return supabase.from(table).delete().eq('id', id);
+  // update touches only the supplied columns; insert replays as an upsert so a
+  // retry after a partial failure can't collide on the primary key.
+  if (op === 'update') return supabase.from(table).update(row ?? {}).eq('id', id);
+  return supabase.from(table).upsert({ ...row, id, user_id: uid });
+}
+
+/** Replay queued writes in order. Every op is idempotent, so retries are safe. */
 export async function flushPending(): Promise<number> {
   const uid = userId();
   if (!uid) return 0;
@@ -300,8 +332,8 @@ export async function flushPending(): Promise<number> {
 
   const synced: string[] = [];
   for (const w of queue) {
-    const { error } = await supabase.from(w.table).upsert({ ...w.row, id: w.id, user_id: uid });
-    if (error) console.warn(`flush ${w.table} ${w.id} failed:`, error.message);
+    const { error } = await runWrite(w.table, w.id, w.op, w.row, uid);
+    if (error) console.warn(`flush ${w.op} ${w.table} ${w.id} failed:`, error.message);
     else synced.push(w.id);
   }
   if (synced.length) useApp.getState().clearPending(synced);
@@ -407,16 +439,7 @@ export function logFood(input: Omit<FoodLog, 'id'>) {
 
 export function deleteFood(id: string) {
   useApp.getState().deleteFood(id);
-  // Drop it from the queue too, or a later flush would resurrect it.
-  useApp.getState().clearPending([id]);
-  if (!userId()) return;
-  supabase
-    .from('food_logs')
-    .delete()
-    .eq('id', id)
-    .then(({ error }) => {
-      if (error) console.warn('food delete sync failed:', error.message);
-    });
+  pushDelete('food_logs', id, 'food');
 }
 
 export function addFavoriteFood(input: Omit<FavoriteFood, 'id'>) {
@@ -436,13 +459,55 @@ export function addFavoriteFood(input: Omit<FavoriteFood, 'id'>) {
 
 export function removeFavoriteFood(id: string) {
   useApp.getState().removeFavoriteFood(id);
-  useApp.getState().clearPending([id]);
-  if (!userId()) return;
-  supabase
-    .from('favorite_foods')
-    .delete()
-    .eq('id', id)
-    .then(({ error }) => {
-      if (error) console.warn('favorite food delete sync failed:', error.message);
-    });
+  pushDelete('favorite_foods', id, 'favorite food');
+}
+
+/** Edit an existing run. Only editable columns are sent, so a run imported
+ *  from Apple Health keeps its source and external_id (and stays deduped). */
+export function updateRun(run: Run) {
+  useApp.getState().updateRun(run);
+  push(
+    'runs',
+    run.id,
+    {
+      started_at: `${run.date}T12:00:00Z`,
+      local_date: run.date,
+      distance_m: Math.round(run.distanceMi * M_PER_MI),
+      duration_s: run.durationS,
+      workout_type: run.type,
+      shoe_id: run.shoeId ?? null,
+      rpe: run.rpe ?? null,
+    },
+    'run',
+    'update'
+  );
+}
+
+export function deleteRun(id: string) {
+  useApp.getState().deleteRun(id);
+  pushDelete('runs', id, 'run');
+}
+
+export function updateShoe(shoe: Shoe) {
+  useApp.getState().updateShoe(shoe);
+  push(
+    'shoes',
+    shoe.id,
+    {
+      brand: shoe.brand,
+      model: shoe.model,
+      lifespan_miles: shoe.lifespanMiles,
+      starting_miles: shoe.startingMiles,
+      color: shoe.color,
+      is_default: shoe.isDefault ?? false,
+      retired_at: shoe.retiredAt ?? null,
+    },
+    'shoe',
+    'update'
+  );
+}
+
+export function deleteShoe(id: string) {
+  useApp.getState().deleteShoe(id);
+  pushDelete('shoes', id, 'shoe');
 }

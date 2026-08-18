@@ -117,8 +117,11 @@ export interface PendingWrite {
   /** The row id, so a replay is idempotent and can be matched to local state. */
   id: string;
   table: 'runs' | 'cross_training' | 'journal_entries' | 'shoes' | 'food_logs' | 'favorite_foods';
-  /** Insert payload without user_id — that's stamped at flush time. */
-  row: Record<string, unknown>;
+  /** insert replays as an upsert; update touches only the given columns, so
+   *  editing an imported run can't clobber its source/external_id. */
+  op: 'insert' | 'update' | 'delete';
+  /** Payload without user_id — that's stamped at flush time. Absent on delete. */
+  row?: Record<string, unknown>;
   queuedAt: string;
 }
 

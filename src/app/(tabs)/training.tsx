@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -64,7 +64,9 @@ export default function Training() {
         .map((shoe) => {
           const miles = shoeMiles(shoe, runs);
           return (
-            <Card key={shoe.id}>
+            <Card
+              key={shoe.id}
+              onPress={() => router.push({ pathname: '/log/shoe', params: { id: shoe.id } })}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                 <View
                   style={{
@@ -102,8 +104,13 @@ export default function Training() {
           </Text>
         ) : null}
         {feed.map((item, i) => (
-          <View
+          <Pressable
             key={item.kind === 'run' ? item.run.id : item.cross.id}
+            onPress={
+              item.kind === 'run'
+                ? () => router.push({ pathname: '/log/run', params: { id: item.run.id } })
+                : undefined
+            }
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -116,7 +123,7 @@ export default function Training() {
             ) : (
               <CrossRow cross={item.cross} />
             )}
-          </View>
+          </Pressable>
         ))}
       </Card>
 
