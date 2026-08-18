@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { round1, uuid } from './format';
 import { syncGoalReminders } from './goalReminders';
 import { clearInsights, fetchLatestInsight } from './insights';
+import { normalizePlan } from './plan';
 import { loginPurchases, logoutPurchases } from './purchases';
 import { checkStrava, clearStrava } from './strava';
 import { clearSymptoms, fetchSymptomPatterns } from './symptoms';
@@ -15,6 +16,7 @@ import type {
   FoodLog,
   JournalEntry,
   PendingWrite,
+  PlanDay,
   Profile,
   Run,
   Shoe,
@@ -240,7 +242,17 @@ export async function pullAll(fallbackName?: string) {
   }
   useAuth.setState({ needsOnboarding: !p?.onboarded_at });
 
-  useApp.getState().hydrateRemote({ runs, cross, journal, shoes, foodLogs, favoriteFoods, profile });
+  useApp.getState().hydrateRemote({
+    runs,
+    cross,
+    journal,
+    shoes,
+    foodLogs,
+    favoriteFoods,
+    // Absent on accounts created before the plan existed — keep the local one.
+    weekPlan: p?.week_plan ? normalizePlan(p.week_plan) : undefined,
+    profile,
+  });
 }
 
 /** Push profile/goal fields (snake_case columns) to the signed-in user's row. */
@@ -486,6 +498,12 @@ export function updateRun(run: Run) {
 export function deleteRun(id: string) {
   useApp.getState().deleteRun(id);
   pushDelete('runs', id, 'run');
+}
+
+/** Save the weekly template. Small enough to write whole rather than diff. */
+export function saveWeekPlan(plan: PlanDay[]) {
+  useApp.getState().setWeekPlan(plan);
+  updateProfileRemote({ week_plan: plan });
 }
 
 export function updateShoe(shoe: Shoe) {

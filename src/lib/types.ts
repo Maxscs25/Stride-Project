@@ -171,6 +171,32 @@ export const WORKOUT_META: Record<WorkoutType, { label: string; color: string }>
   other: { label: 'Other', color: '#94A3B8' },
 };
 
+/** What a given weekday is normally for. 'rest' is a day off, not a workout. */
+export type PlanDayType = WorkoutType | 'rest';
+
+/** One weekday of the recurring training template. */
+export interface PlanDay {
+  /** JS getDay(): 0 = Sunday. */
+  dow: number;
+  type: PlanDayType;
+  /** Target miles for the day; 0 on rest days. */
+  miles: number;
+}
+
+export const DOW_LABEL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** A conventional week: quality Tuesday/Friday, long run Sunday, Saturday off. */
+export const DEFAULT_WEEK_PLAN: PlanDay[] = [
+  { dow: 0, type: 'long', miles: 0 },
+  { dow: 1, type: 'easy', miles: 0 },
+  { dow: 2, type: 'tempo', miles: 0 },
+  { dow: 3, type: 'easy', miles: 0 },
+  { dow: 4, type: 'easy', miles: 0 },
+  { dow: 5, type: 'intervals', miles: 0 },
+  { dow: 6, type: 'rest', miles: 0 },
+];
+
 export const ACTIVITY_META: Record<ActivityType, { label: string; icon: string }> = {
   cycling: { label: 'Cycling', icon: 'bicycle' },
   swimming: { label: 'Swimming', icon: 'water' },

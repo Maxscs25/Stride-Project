@@ -10,10 +10,12 @@ import type {
   FoodLog,
   JournalEntry,
   PendingWrite,
+  PlanDay,
   Profile,
   Run,
   Shoe,
 } from '@/lib/types';
+import { DEFAULT_WEEK_PLAN } from '@/lib/types';
 
 type WithOptionalId<T extends { id: string }> = Omit<T, 'id'> & { id?: string };
 
@@ -24,6 +26,7 @@ interface RemoteData {
   shoes: Shoe[];
   foodLogs: FoodLog[];
   favoriteFoods: FavoriteFood[];
+  weekPlan?: PlanDay[];
   profile?: Partial<Profile>;
 }
 
@@ -31,6 +34,9 @@ interface AppState extends SeedData {
   profile: Profile;
   /** True while showing generated sample data (signed out). */
   demoMode: boolean;
+  /** Recurring weekly template: what each weekday is for + target miles. */
+  weekPlan: PlanDay[];
+  setWeekPlan: (p: PlanDay[]) => void;
   /** Writes not yet confirmed on the server; replayed on the next sign-in. */
   pending: PendingWrite[];
   queueWrite: (w: PendingWrite) => void;
@@ -121,7 +127,10 @@ export const useApp = create<AppState>()(
       ...seed,
       demoMode: true,
       profile: DEFAULT_PROFILE,
+      weekPlan: DEFAULT_WEEK_PLAN,
       pending: [],
+
+      setWeekPlan: (p) => set({ weekPlan: p }),
 
       queueWrite: (w) =>
         set((s) => ({ pending: [...s.pending.filter((p) => p.id !== w.id), w] })),
@@ -236,6 +245,7 @@ export const useApp = create<AppState>()(
             shoes: keepPending(d.shoes, s.shoes, 'shoes', p),
             foodLogs: keepPending(d.foodLogs, s.foodLogs, 'food_logs', p),
             favoriteFoods: keepPending(d.favoriteFoods, s.favoriteFoods, 'favorite_foods', p),
+            weekPlan: d.weekPlan ?? s.weekPlan,
             completions,
             hydration: s.demoMode ? {} : s.hydration,
             prs: s.demoMode ? [] : s.prs,
@@ -248,7 +258,13 @@ export const useApp = create<AppState>()(
       // first). Clearing the queue here stops one account's unsynced rows from
       // being replayed into whichever account signs in next.
       resetDemo: () =>
-        set({ ...buildSeed(), demoMode: true, profile: DEFAULT_PROFILE, pending: [] }),
+        set({
+          ...buildSeed(),
+          demoMode: true,
+          profile: DEFAULT_PROFILE,
+          weekPlan: DEFAULT_WEEK_PLAN,
+          pending: [],
+        }),
     }),
     {
       name: 'stride-store',

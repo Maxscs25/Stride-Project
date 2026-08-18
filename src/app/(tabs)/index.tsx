@@ -8,6 +8,7 @@ import { InsightCard } from '@/components/InsightCard';
 import { Card, ProgressBar, Screen, SectionHeader, StatTile } from '@/components/ui';
 import { fmtLongDate, round1, todayKey, weekStartKey } from '@/lib/format';
 import { daysUntilGoal } from '@/lib/goalReminders';
+import { plannedFor, planTypeColor, planTypeLabel } from '@/lib/plan';
 import { useInsights } from '@/lib/insights';
 import { buildInsight, shoeMiles, weeklyMiles } from '@/lib/load';
 import { currentStreak } from '@/lib/streaks';
@@ -99,6 +100,8 @@ export default function Today() {
       <GoalCard />
       <InsightCard insight={insight} />
 
+      <TodayPlanCard />
+
       <SectionHeader title="This Week" />
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10 }}>
@@ -152,6 +155,58 @@ export default function Today() {
         onToggle={(key) => toggleItem(today, key)}
       />
     </Screen>
+  );
+}
+
+/** What today is for, per the weekly template, and how much of it is done. */
+function TodayPlanCard() {
+  const { colors } = useTheme();
+  const weekPlan = useApp((s) => s.weekPlan);
+  const runs = useApp((s) => s.runs);
+  const today = todayKey();
+  const plan = plannedFor(weekPlan, today);
+  if (!plan) return null;
+
+  const done = round1(runs.filter((r) => r.date === today).reduce((a, r) => a + r.distanceMi, 0));
+  const rest = plan.type === 'rest';
+  const left = round1(Math.max(0, plan.miles - done));
+  const complete = !rest && done >= plan.miles && plan.miles > 0;
+
+  return (
+    <Card
+      onPress={() => router.push('/plan')}
+      style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          backgroundColor: planTypeColor(plan.type, colors.textMuted) + '22',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 12,
+        }}>
+        <Ionicons
+          name={rest ? 'bed-outline' : complete ? 'checkmark' : 'walk'}
+          size={19}
+          color={planTypeColor(plan.type, colors.textMuted)}
+        />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>
+          TODAY'S PLAN
+        </Text>
+        <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700', marginTop: 2 }}>
+          {rest ? 'Rest day' : `${plan.miles} mi ${planTypeLabel(plan.type).toLowerCase()}`}
+        </Text>
+        {!rest && done > 0 ? (
+          <Text style={{ color: complete ? colors.good : colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+            {complete ? `Done — ${done} mi logged` : `${done} mi logged · ${left} mi to go`}
+          </Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
+    </Card>
   );
 }
 

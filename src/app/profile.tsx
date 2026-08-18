@@ -117,6 +117,19 @@ export default function Profile() {
         <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
       </Card>
 
+      <Card
+        onPress={() => router.push('/plan')}
+        style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons name="calendar-outline" size={18} color={colors.accent} style={{ marginRight: 12 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>Weekly plan</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+            Set what each day is for and split your goal across the week.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Card>
+
       <Card>
         <Row label="Name" value={profile.name} />
         <Row label="Race goal" value={profile.raceGoal} />
