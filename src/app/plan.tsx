@@ -27,7 +27,12 @@ export default function WeekPlan() {
   const stored = useApp((s) => s.weekPlan);
   const goal = useApp((s) => s.profile.weeklyGoalMi);
 
-  const [plan, setPlan] = useState<PlanDay[]>(stored);
+  // Open with a usable week rather than a column of zeros: if no targets have
+  // been set yet, start from the goal split across the default day types. It's
+  // only committed if they hit Save.
+  const [plan, setPlan] = useState<PlanDay[]>(() =>
+    planTotal(stored) === 0 ? distributeMiles(stored, goal) : stored
+  );
   const [openDow, setOpenDow] = useState<number | null>(null);
 
   const total = planTotal(plan);

@@ -8,7 +8,7 @@ import { InsightCard } from '@/components/InsightCard';
 import { Card, ProgressBar, Screen, SectionHeader, StatTile } from '@/components/ui';
 import { fmtLongDate, round1, todayKey, weekStartKey } from '@/lib/format';
 import { daysUntilGoal } from '@/lib/goalReminders';
-import { plannedFor, planTypeColor, planTypeLabel } from '@/lib/plan';
+import { plannedFor, planTotal, planTypeColor, planTypeLabel } from '@/lib/plan';
 import { useInsights } from '@/lib/insights';
 import { buildInsight, shoeMiles, weeklyMiles } from '@/lib/load';
 import { currentStreak } from '@/lib/streaks';
@@ -171,6 +171,9 @@ function TodayPlanCard() {
   const rest = plan.type === 'rest';
   const left = round1(Math.max(0, plan.miles - done));
   const complete = !rest && done >= plan.miles && plan.miles > 0;
+  // Fresh template: day types exist but no mileage yet. Showing "0 mi tempo"
+  // would read as a target of zero, so prompt for targets instead.
+  const unset = !rest && planTotal(weekPlan) === 0;
 
   return (
     <Card
@@ -197,9 +200,17 @@ function TodayPlanCard() {
           TODAY'S PLAN
         </Text>
         <Text style={{ color: colors.text, fontSize: 15, fontWeight: '700', marginTop: 2 }}>
-          {rest ? 'Rest day' : `${plan.miles} mi ${planTypeLabel(plan.type).toLowerCase()}`}
+          {rest
+            ? 'Rest day'
+            : unset
+              ? `${planTypeLabel(plan.type)} day`
+              : `${plan.miles} mi ${planTypeLabel(plan.type).toLowerCase()}`}
         </Text>
-        {!rest && done > 0 ? (
+        {unset ? (
+          <Text style={{ color: colors.accent, fontSize: 12, marginTop: 2 }}>
+            Set your weekly mileage targets →
+          </Text>
+        ) : !rest && done > 0 ? (
           <Text style={{ color: complete ? colors.good : colors.textSecondary, fontSize: 12, marginTop: 2 }}>
             {complete ? `Done — ${done} mi logged` : `${done} mi logged · ${left} mi to go`}
           </Text>
