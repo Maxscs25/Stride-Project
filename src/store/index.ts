@@ -165,12 +165,19 @@ export const useApp = create<AppState>()(
       updateShoe: (shoe) =>
         set((s) => ({ shoes: s.shoes.map((x) => (x.id === shoe.id ? shoe : x)) })),
 
-      // Runs keep their shoeId; shoeMiles() just stops matching, and the DB
-      // mirrors this with `shoe_id ... on delete set null`.
+      // Runs are kept; they just stop counting toward any shoe. The DB mirrors
+      // this with `shoe_id ... on delete set null`. Splits have to be pruned
+      // here too, or the deleted shoe's share would linger in the run's jsonb.
       deleteShoe: (id) =>
         set((s) => ({
           shoes: s.shoes.filter((x) => x.id !== id),
-          runs: s.runs.map((r) => (r.shoeId === id ? { ...r, shoeId: undefined } : r)),
+          runs: s.runs.map((r) => {
+            if (r.shoeSplits?.some((sp) => sp.shoeId === id)) {
+              const kept = r.shoeSplits.filter((sp) => sp.shoeId !== id);
+              return { ...r, shoeSplits: kept.length ? kept : undefined };
+            }
+            return r.shoeId === id ? { ...r, shoeId: undefined } : r;
+          }),
         })),
 
       logCross: (c) =>

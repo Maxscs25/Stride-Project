@@ -159,6 +159,7 @@ export async function pullAll(fallbackName?: string) {
     durationS: r.duration_s,
     type: r.workout_type === 'fartlek' ? 'other' : r.workout_type,
     shoeId: r.shoe_id ?? undefined,
+    shoeSplits: r.shoe_splits ?? undefined,
     rpe: r.rpe ?? undefined,
     externalId: r.external_id ?? undefined,
   }));
@@ -371,6 +372,7 @@ export function logRun(input: Omit<Run, 'id'>) {
     duration_s: input.durationS,
     workout_type: input.type,
     shoe_id: input.shoeId ?? null,
+    shoe_splits: input.shoeSplits ?? null,
     rpe: input.rpe ?? null,
     source: 'manual',
   }, 'run');
@@ -489,6 +491,7 @@ export function updateRun(run: Run) {
       duration_s: run.durationS,
       workout_type: run.type,
       shoe_id: run.shoeId ?? null,
+      shoe_splits: run.shoeSplits ?? null,
       rpe: run.rpe ?? null,
     },
     'run',

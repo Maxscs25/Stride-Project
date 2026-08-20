@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
@@ -5,7 +6,7 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { DatePicker } from '@/components/DatePicker';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
-import { addDays, fmtLongDate, fmtPace, todayKey } from '@/lib/format';
+import { addDays, fmtLongDate, fmtPace, round1, todayKey } from '@/lib/format';
 import { shoeMiles } from '@/lib/load';
 import { deleteRun, logRun, updateRun } from '@/lib/sync';
 import { WORKOUT_META, type WorkoutType } from '@/lib/types';
@@ -34,16 +35,45 @@ export default function LogRun() {
   );
   const [rpe, setRpe] = useState<number | undefined>(editing?.rpe);
   const [note, setNote] = useState(editing?.note ?? '');
+  const [splitting, setSplitting] = useState(!!editing?.shoeSplits?.length);
+  const [splits, setSplits] = useState<Record<string, number>>(() =>
+    Object.fromEntries((editing?.shoeSplits ?? []).map((s) => [s.shoeId, s.miles]))
+  );
 
   const mi = parseFloat(distance);
   const min = parseFloat(minutes);
   const valid = mi > 0 && min > 0;
   const durationS = valid ? Math.round(min * 60) : 0;
 
+  const activeShoes = shoes.filter((s) => !s.retiredAt);
+  const splitTotal = round1(Object.values(splits).reduce((a, v) => a + v, 0));
+  const splitRemaining = valid ? round1(mi - splitTotal) : 0;
+  const setSplit = (id: string, v: number) => setSplits((p) => ({ ...p, [id]: v }));
+
+  /** Seed the split from the run's distance so there's something to adjust. */
+  const toggleSplit = () => {
+    setSplitting((on) => {
+      if (!on && Object.keys(splits).length === 0 && valid && shoeId) {
+        setSplits({ [shoeId]: mi });
+      }
+      return !on;
+    });
+  };
+
+  const shoeFields = () =>
+    splitting
+      ? {
+          shoeId: undefined,
+          shoeSplits: activeShoes
+            .filter((s) => (splits[s.id] ?? 0) > 0)
+            .map((s) => ({ shoeId: s.id, miles: splits[s.id] })),
+        }
+      : { shoeId, shoeSplits: undefined };
+
   const save = () => {
     if (!valid) return;
     if (editing) {
-      updateRun({ ...editing, date, distanceMi: mi, durationS, type, shoeId, rpe });
+      updateRun({ ...editing, date, distanceMi: mi, durationS, type, rpe, ...shoeFields() });
       router.back();
       return;
     }
@@ -52,9 +82,9 @@ export default function LogRun() {
       distanceMi: mi,
       durationS,
       type,
-      shoeId,
       rpe,
       note: note.trim() || undefined,
+      ...shoeFields(),
     });
     finishLogging();
   };
@@ -153,11 +183,68 @@ export default function LogRun() {
         ))}
       </View>
 
-      <Label text="Shoe" />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
-        {shoes
-          .filter((s) => !s.retiredAt)
-          .map((s) => (
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <Label text="Shoe" />
+        </View>
+        {activeShoes.length > 1 ? (
+          <Pressable onPress={toggleSplit} hitSlop={8} style={{ paddingBottom: 8 }}>
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800' }}>
+              {splitting ? 'Use one shoe' : 'Split across shoes'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {splitting ? (
+        <View style={{ marginBottom: 8 }}>
+          {activeShoes.map((s) => {
+            const val = splits[s.id] ?? 0;
+            return (
+              <View
+                key={s.id}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 7 }}>
+                <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
+                  {s.model}
+                </Text>
+                <Stepper
+                  onPress={() => setSplit(s.id, Math.max(0, val - 0.5))}
+                  icon="remove"
+                />
+                <Text
+                  style={{
+                    color: val > 0 ? colors.text : colors.textMuted,
+                    fontSize: 15,
+                    fontWeight: '800',
+                    marginHorizontal: 12,
+                    minWidth: 46,
+                    textAlign: 'center',
+                  }}>
+                  {val} mi
+                </Text>
+                <Stepper onPress={() => setSplit(s.id, val + 0.5)} icon="add" />
+              </View>
+            );
+          })}
+          <Text
+            style={{
+              color: splitRemaining === 0 ? colors.good : colors.warn,
+              fontSize: 12,
+              fontWeight: '700',
+              marginTop: 4,
+            }}>
+            {!valid
+              ? 'Enter the run distance first'
+              : splitRemaining === 0
+                ? `All ${mi} mi assigned`
+                : splitRemaining > 0
+                  ? `${round1(splitRemaining)} mi still unassigned`
+                  : `${round1(-splitRemaining)} mi over the run distance`}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
+          {activeShoes.map((s) => (
             <Chip
               key={s.id}
               label={`${s.model} · ${Math.max(
@@ -168,7 +255,8 @@ export default function LogRun() {
               onPress={() => setShoeId(s.id)}
             />
           ))}
-      </View>
+        </View>
+      )}
 
       <Label text="Effort (RPE, optional)" />
       <Segmented
@@ -226,6 +314,25 @@ export default function LogRun() {
         </Pressable>
       ) : null}
     </ModalShell>
+  );
+}
+
+function Stepper({ onPress, icon }: { onPress: () => void; icon: 'add' | 'remove' }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: colors.surfaceAlt,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <Ionicons name={icon} size={17} color={colors.textSecondary} />
+    </Pressable>
   );
 }
 

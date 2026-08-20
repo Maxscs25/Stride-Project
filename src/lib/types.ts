@@ -8,13 +8,23 @@ export type WorkoutType =
   | 'hills'
   | 'other';
 
+/** Part of a run's distance attributed to one shoe. */
+export interface ShoeSplit {
+  shoeId: string;
+  miles: number;
+}
+
 export interface Run {
   id: string;
   date: string; // YYYY-MM-DD (local)
   distanceMi: number;
   durationS: number;
   type: WorkoutType;
+  /** The shoe for a normal single-shoe run. Ignored when shoeSplits is set. */
   shoeId?: string;
+  /** Set only when a run's mileage is divided between shoes (e.g. a shakeout
+   *  in one pair and the workout in another). Takes precedence over shoeId. */
+  shoeSplits?: ShoeSplit[];
   rpe?: number; // 1-10
   note?: string;
   externalId?: string; // dedupe key for imported runs (HealthKit UUID, Strava/Terra id)

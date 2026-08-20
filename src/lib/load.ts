@@ -75,10 +75,17 @@ export function weeklyMileSeries(runs: Run[], nWeeks: number) {
   return out;
 }
 
+/** Miles a single run contributes to one shoe, honouring any split. */
+export function runMilesForShoe(run: Run, shoeId: string): number {
+  if (run.shoeSplits?.length) {
+    return run.shoeSplits.reduce((a, s) => (s.shoeId === shoeId ? a + s.miles : a), 0);
+  }
+  return run.shoeId === shoeId ? run.distanceMi : 0;
+}
+
 export function shoeMiles(shoe: Shoe, runs: Run[]): number {
   return round1(
-    shoe.startingMiles +
-      runs.filter((r) => r.shoeId === shoe.id).reduce((a, r) => a + r.distanceMi, 0)
+    shoe.startingMiles + runs.reduce((a, r) => a + runMilesForShoe(r, shoe.id), 0)
   );
 }
 
