@@ -237,6 +237,7 @@ export async function pullAll(fallbackName?: string) {
       ? p.goal_reminder
       : 'off';
     profile.goalReminderMinute = p.goal_reminder_minute != null ? Number(p.goal_reminder_minute) : 480;
+    profile.weekStartsOn = p.week_starts_on === 0 ? 0 : 1;
   } else if (fallbackName) {
     profile.name = fallbackName;
   }

@@ -150,6 +150,8 @@ export interface Profile {
   personalGoal?: string;
   /** Optional target date (YYYY-MM-DD) so the app can count down to it. */
   personalGoalDate?: string;
+  /** 0 = weeks start Sunday, 1 = Monday. */
+  weekStartsOn: 0 | 1;
   goalReminder: GoalReminder;
   /** Minutes past local midnight for the reminder (e.g. 480 = 8:00 AM). */
   goalReminderMinute: number;

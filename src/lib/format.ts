@@ -20,12 +20,35 @@ export function addDays(k: string, n: number): string {
   return dateKey(d);
 }
 
-/** Monday-based start of the week containing k. */
-export function weekStartKey(k: string): string {
+/** 0 = weeks start Sunday, 1 = Monday. */
+export type WeekStart = 0 | 1;
+
+/**
+ * Which day weeks start on, mirrored from the user's profile.
+ *
+ * Held here rather than threaded through every caller: weekStartKey feeds a
+ * dozen pure functions (weekly mileage, load series, heatmap, seed data), and
+ * passing a preference through all of them would be noisy and easy to miss.
+ * The store keeps the source of truth and pushes changes here via subscribe,
+ * so React still re-renders — this is only a read cache for the math.
+ */
+let weekStart: WeekStart = 1;
+export const setWeekStart = (d: WeekStart) => {
+  weekStart = d;
+};
+export const getWeekStart = () => weekStart;
+
+/** Start of the week containing k, per the user's week-start preference. */
+export function weekStartKey(k: string, startsOn: WeekStart = weekStart): string {
   const d = parseKey(k);
-  const dow = (d.getDay() + 6) % 7;
+  const dow = (d.getDay() - startsOn + 7) % 7;
   d.setDate(d.getDate() - dow);
   return dateKey(d);
+}
+
+/** Weekday indices (JS getDay()) in display order for the current preference. */
+export function orderedDows(startsOn: WeekStart = weekStart): number[] {
+  return Array.from({ length: 7 }, (_, i) => (i + startsOn) % 7);
 }
 
 export function fmtDuration(s: number): string {

@@ -9,6 +9,7 @@ import {
   fmtDuration,
   fmtLongDate,
   fmtPace,
+  parseKey,
   round1,
   todayKey,
   weekStartKey,
@@ -203,7 +204,8 @@ function NavBtn({
   );
 }
 
-const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+/** Indexed by JS getDay(), so it follows whichever day the week starts on. */
+const DAY_INITIAL = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const CHART_H = 140;
 
 function WeekBars({
@@ -270,7 +272,7 @@ function WeekBars({
                 fontWeight: isToday || selected ? '800' : '600',
                 marginTop: 6,
               }}>
-              {WEEKDAYS[i]}
+              {DAY_INITIAL[parseKey(p.date).getDay()]}
             </Text>
             <View style={{ flexDirection: 'row', height: 6, marginTop: 3 }}>
               {p.cross.length ? <Dot color={colors.info} /> : null}

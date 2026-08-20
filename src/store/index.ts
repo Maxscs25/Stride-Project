@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { todayKey, uid } from '@/lib/format';
+import { setWeekStart, todayKey, uid } from '@/lib/format';
 import { buildSeed, type SeedData } from '@/lib/seed';
 import type {
   CrossSession,
@@ -113,6 +113,7 @@ const DEFAULT_PROFILE: Profile = {
   name: 'Runner',
   weeklyGoalMi: 35,
   raceGoal: 'Sub-19 5K · Oct 10',
+  weekStartsOn: 1,
   goalReminder: 'off',
   goalReminderMinute: 480,
   heightCm: 178,
@@ -270,6 +271,17 @@ export const useApp = create<AppState>()(
       name: 'stride-store',
       version: 1,
       storage: createJSONStorage(() => AsyncStorage),
+      // Rehydrating from disk bypasses subscribe, so re-apply on load too.
+      onRehydrateStorage: () => (state) => {
+        if (state) setWeekStart(state.profile.weekStartsOn ?? 1);
+      },
     }
   )
 );
+
+// Mirror the week-start preference into format.ts, which the week-boundary
+// math reads. Subscribing (rather than threading a param through every caller)
+// keeps this in step; the store stays the source of truth, so components still
+// re-render off profile changes and then read the updated value.
+setWeekStart(useApp.getState().profile.weekStartsOn ?? 1);
+useApp.subscribe((s) => setWeekStart(s.profile.weekStartsOn ?? 1));

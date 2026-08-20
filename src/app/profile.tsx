@@ -19,6 +19,7 @@ export default function Profile() {
   const { colors } = useTheme();
   const profile = useApp((s) => s.profile);
   const setWeeklyGoal = useApp((s) => s.setWeeklyGoal);
+  const setProfile = useApp((s) => s.setProfile);
   const resetDemo = useApp((s) => s.resetDemo);
 
   const confirmReset = () => {
@@ -169,6 +170,47 @@ export default function Profile() {
               }}
               icon="add"
             />
+          </View>
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingVertical: 10,
+          }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Weeks start on</Text>
+          <View style={{ flexDirection: 'row' }}>
+            {([0, 1] as const).map((d) => {
+              const on = (profile.weekStartsOn ?? 1) === d;
+              return (
+                <Pressable
+                  key={d}
+                  onPress={() => {
+                    setProfile({ weekStartsOn: d });
+                    updateProfileRemote({ week_starts_on: d });
+                  }}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    borderRadius: 999,
+                    marginLeft: 8,
+                    backgroundColor: on ? colors.accent : colors.surfaceAlt,
+                    borderWidth: 1,
+                    borderColor: on ? colors.accent : colors.border,
+                  }}>
+                  <Text
+                    style={{
+                      color: on ? colors.onAccent : colors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: '700',
+                    }}>
+                    {d === 0 ? 'Sunday' : 'Monday'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       </Card>
