@@ -59,6 +59,36 @@ export function fmtDuration(s: number): string {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+/**
+ * A run duration typed either as clock time ("45:30", "1:05:20") or as plain
+ * minutes ("45", "45.5"). Returns seconds, or null if it isn't a sensible
+ * duration. Bare minutes stay supported so anyone used to the old field — or
+ * re-typing a saved value — isn't forced to change how they enter it.
+ */
+export function parseDuration(input: string): number | null {
+  const t = input.trim();
+  if (!t) return null;
+
+  if (t.includes(':')) {
+    const parts = t.split(':');
+    if (parts.length < 2 || parts.length > 3) return null;
+    // Number('') is 0, so an empty field would otherwise slip through and
+    // ":30" would silently read as 30 seconds.
+    if (parts.some((p) => p.length === 0)) return null;
+    const n = parts.map(Number);
+    if (n.some((x) => !Number.isFinite(x) || x < 0)) return null;
+    // Everything after the first field is a two-digit sub-60 value, so "5:6"
+    // and "5:75" are rejected rather than silently misread.
+    if (parts.slice(1).some((p) => p.length !== 2)) return null;
+    if (n.slice(1).some((x) => x >= 60)) return null;
+    const secs = parts.length === 2 ? n[0] * 60 + n[1] : n[0] * 3600 + n[1] * 60 + n[2];
+    return secs > 0 ? secs : null;
+  }
+
+  const mins = Number(t);
+  return Number.isFinite(mins) && mins > 0 ? Math.round(mins * 60) : null;
+}
+
 export function fmtPace(mi: number, s: number): string {
   if (!mi || !s) return '—';
   const sp = s / mi;

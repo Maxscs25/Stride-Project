@@ -6,7 +6,15 @@ import { Alert, Pressable, Text, View } from 'react-native';
 import { DatePicker } from '@/components/DatePicker';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
-import { addDays, fmtLongDate, fmtPace, round1, todayKey } from '@/lib/format';
+import {
+  addDays,
+  fmtDuration,
+  fmtLongDate,
+  fmtPace,
+  parseDuration,
+  round1,
+  todayKey,
+} from '@/lib/format';
 import { shoeMiles } from '@/lib/load';
 import { deleteRun, logRun, updateRun } from '@/lib/sync';
 import { WORKOUT_META, type WorkoutType } from '@/lib/types';
@@ -26,9 +34,8 @@ export default function LogRun() {
   const [date, setDate] = useState(editing?.date ?? todayKey());
   const [showCal, setShowCal] = useState(false);
   const [distance, setDistance] = useState(editing ? String(editing.distanceMi) : '');
-  const [minutes, setMinutes] = useState(
-    editing ? String(Math.round((editing.durationS / 60) * 100) / 100) : ''
-  );
+  // Round-trips as clock time, so editing shows "45:30" rather than "45.5".
+  const [minutes, setMinutes] = useState(editing ? fmtDuration(editing.durationS) : '');
   const [type, setType] = useState<WorkoutType>(editing?.type ?? 'easy');
   const [shoeId, setShoeId] = useState<string | undefined>(
     editing?.shoeId ?? shoes.find((s) => s.isDefault && !s.retiredAt)?.id ?? shoes[0]?.id
@@ -41,9 +48,9 @@ export default function LogRun() {
   );
 
   const mi = parseFloat(distance);
-  const min = parseFloat(minutes);
-  const valid = mi > 0 && min > 0;
-  const durationS = valid ? Math.round(min * 60) : 0;
+  const durationS = parseDuration(minutes) ?? 0;
+  const valid = mi > 0 && durationS > 0;
+  const timeEntered = minutes.trim().length > 0;
 
   const activeShoes = shoes.filter((s) => !s.retiredAt);
   const splitTotal = round1(Object.values(splits).reduce((a, v) => a + v, 0));
@@ -156,14 +163,20 @@ export default function LogRun() {
         </View>
         <View style={{ flex: 1 }}>
           <Field
-            label="Time (minutes)"
+            label="Time"
             value={minutes}
             onChangeText={setMinutes}
-            keyboardType="decimal-pad"
-            placeholder="45"
+            // decimal-pad has no colon; this keyboard does.
+            keyboardType="numbers-and-punctuation"
+            placeholder="45:30"
           />
         </View>
       </View>
+      {timeEntered && durationS === 0 ? (
+        <Text style={{ color: colors.warn, fontSize: 12, marginTop: -6, marginBottom: 10, lineHeight: 17 }}>
+          Enter time as mm:ss (45:30), h:mm:ss (1:05:20), or just minutes (45).
+        </Text>
+      ) : null}
       {valid ? (
         <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '800', marginBottom: 12 }}>
           Pace: {fmtPace(mi, durationS)}
