@@ -162,6 +162,10 @@ export interface Profile {
   personalGoalDate?: string;
   /** 0 = weeks start Sunday, 1 = Monday. */
   weekStartsOn: 0 | 1;
+  /** A recent race/time-trial, stored raw so VDOT can be recomputed from it. */
+  vo2BaselineMeters?: number;
+  vo2BaselineSeconds?: number;
+  vo2BaselineDate?: string;
   goalReminder: GoalReminder;
   /** Minutes past local midnight for the reminder (e.g. 480 = 8:00 AM). */
   goalReminderMinute: number;

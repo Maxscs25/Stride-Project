@@ -12,6 +12,7 @@ import { buildInsight, loadSeries, symptomMentions, weeklyMileSeries } from '@/l
 import { useIsPremium } from '@/lib/purchases';
 import { useAuth } from '@/lib/sync';
 import { bodyPartLabel, useSymptoms } from '@/lib/symptoms';
+import { vdotFrom } from '@/lib/vo2';
 import { useApp } from '@/store';
 import { useTheme } from '@/theme';
 
@@ -33,6 +34,10 @@ export default function Insights() {
   const { latest: remoteInsight, generating, error } = useInsights();
   const insight = remoteInsight ?? localInsight;
   const premium = useIsPremium();
+  const vo2 =
+    profile.vo2BaselineMeters && profile.vo2BaselineSeconds
+      ? vdotFrom(profile.vo2BaselineMeters, profile.vo2BaselineSeconds)
+      : null;
 
   // Prefer AI-extracted symptom patterns; fall back to on-device keyword
   // detection for demo mode / before the first extraction.
@@ -175,6 +180,33 @@ export default function Insights() {
           />
         </>
       )}
+
+      <SectionHeader title="VO2 Max" />
+      <Card onPress={() => router.push('/vo2')} style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            backgroundColor: colors.accent + '22',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+          }}>
+          <Ionicons name="fitness" size={20} color={colors.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>
+            {vo2 != null ? `${vo2} ml/kg/min` : 'Estimate your VO2 max'}
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 2 }}>
+            {vo2 != null
+              ? 'See equivalent race times, or update from a newer race.'
+              : 'Enter a recent race or time trial to see your fitness and race predictions.'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </Card>
 
       <SectionHeader title="Running Form" />
       <Card onPress={() => router.push('/form')} style={{ flexDirection: 'row', alignItems: 'center' }}>

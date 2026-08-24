@@ -239,6 +239,9 @@ export async function pullAll(fallbackName?: string) {
       : 'off';
     profile.goalReminderMinute = p.goal_reminder_minute != null ? Number(p.goal_reminder_minute) : 480;
     profile.weekStartsOn = p.week_starts_on === 0 ? 0 : 1;
+    profile.vo2BaselineMeters = p.vo2_baseline_meters ? Number(p.vo2_baseline_meters) : undefined;
+    profile.vo2BaselineSeconds = p.vo2_baseline_seconds ?? undefined;
+    profile.vo2BaselineDate = p.vo2_baseline_date ?? undefined;
   } else if (fallbackName) {
     profile.name = fallbackName;
   }
