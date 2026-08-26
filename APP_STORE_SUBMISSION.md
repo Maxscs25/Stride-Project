@@ -156,7 +156,15 @@ Then in App Store Connect:
 
 Set secrets that the app needs at build time (EAS reads `.env`, or set them in the EAS dashboard): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_REVENUECAT_IOS_KEY`.
 
-Bump `version` in app.json for each App Store version; EAS auto-increments the build number.
+**Bump `version` in app.json before every release build.** EAS auto-increments
+the *build* number (10, 11, …) but not the version string, and Apple rejects an
+upload whose `CFBundleShortVersionString` matches an already-approved release:
+
+> 90186: Invalid Pre-Release Train. The train version '1.0.0' is closed for new
+> build submissions.
+
+Bug fix → `1.0.1`, new features → `1.1.0`. The binary is fine when this happens;
+only the version stamp is wrong, so bump and rebuild.
 
 ---
 
