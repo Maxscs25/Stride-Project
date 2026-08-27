@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { DatePicker } from '@/components/DatePicker';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { Chip, Field, Segmented } from '@/components/ui';
-import { todayKey } from '@/lib/format';
+import { addDays, fmtLongDate, todayKey } from '@/lib/format';
 import { logCross } from '@/lib/sync';
 import { ACTIVITY_META, type ActivityType } from '@/lib/types';
 import { radius, useTheme } from '@/theme';
@@ -13,6 +14,8 @@ const ACTIVITIES = Object.entries(ACTIVITY_META) as [ActivityType, { label: stri
 export default function LogCross() {
   const { colors } = useTheme();
 
+  const [date, setDate] = useState(todayKey());
+  const [showCal, setShowCal] = useState(false);
   const [activity, setActivity] = useState<ActivityType>('strength');
   const [minutes, setMinutes] = useState('');
   const [intensity, setIntensity] = useState<number | undefined>();
@@ -20,11 +23,12 @@ export default function LogCross() {
 
   const min = parseFloat(minutes);
   const valid = min > 0;
+  const yesterday = addDays(todayKey(), -1);
 
   const save = () => {
     if (!valid) return;
     logCross({
-      date: todayKey(),
+      date,
       activity,
       minutes: Math.round(min),
       intensity,
@@ -35,6 +39,44 @@ export default function LogCross() {
 
   return (
     <ModalShell title="Cross-Training">
+      <Label text="When" />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
+        <Chip
+          label="Today"
+          selected={date === todayKey() && !showCal}
+          onPress={() => {
+            setDate(todayKey());
+            setShowCal(false);
+          }}
+        />
+        <Chip
+          label="Yesterday"
+          selected={date === yesterday && !showCal}
+          onPress={() => {
+            setDate(yesterday);
+            setShowCal(false);
+          }}
+        />
+        <Chip
+          label={
+            date !== todayKey() && date !== yesterday
+              ? fmtLongDate(date).replace(/^\w+, /, '')
+              : 'Pick a date'
+          }
+          selected={showCal || (date !== todayKey() && date !== yesterday)}
+          onPress={() => setShowCal((v) => !v)}
+        />
+      </View>
+      {showCal ? (
+        <DatePicker
+          value={date}
+          onChange={(k) => {
+            setDate(k);
+            setShowCal(false);
+          }}
+        />
+      ) : null}
+
       <Label text="Activity" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
         {ACTIVITIES.map(([value, meta]) => (
