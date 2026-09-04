@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { ModalShell, finishLogging } from '@/components/ModalShell';
+import { WhenPicker } from '@/components/WhenPicker';
 import { Chip, Field, Segmented } from '@/components/ui';
 import { todayKey } from '@/lib/format';
 import { addJournal } from '@/lib/sync';
@@ -12,6 +13,7 @@ const SCALE = [1, 2, 3, 4, 5].map((v) => ({ value: v, label: String(v) }));
 export default function LogJournal() {
   const { colors } = useTheme();
 
+  const [date, setDate] = useState(todayKey());
   const [energy, setEnergy] = useState<number | undefined>();
   const [soreness, setSoreness] = useState<number | undefined>();
   const [stress, setStress] = useState<number | undefined>();
@@ -26,7 +28,7 @@ export default function LogJournal() {
   const save = () => {
     if (!hasContent) return;
     addJournal({
-      date: todayKey(),
+      date,
       energy,
       soreness,
       stress,
@@ -43,6 +45,11 @@ export default function LogJournal() {
         Ten seconds is enough — the AI coach mines these entries for patterns like recurring
         tightness, fading energy, or poor sleep.
       </Text>
+
+      <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+        When
+      </Text>
+      <WhenPicker value={date} onChange={setDate} />
 
       <ScaleRow label="Energy" value={energy} onChange={setEnergy} />
       <ScaleRow label="Soreness" value={soreness} onChange={setSoreness} />

@@ -3,13 +3,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
-import { DatePicker } from '@/components/DatePicker';
 import { ModalShell, finishLogging } from '@/components/ModalShell';
+import { WhenPicker } from '@/components/WhenPicker';
 import { Chip, Field, Segmented } from '@/components/ui';
 import {
-  addDays,
   fmtDuration,
-  fmtLongDate,
   fmtPace,
   parseDuration,
   round1,
@@ -32,7 +30,6 @@ export default function LogRun() {
   const editing = runs.find((r) => r.id === id);
 
   const [date, setDate] = useState(editing?.date ?? todayKey());
-  const [showCal, setShowCal] = useState(false);
   const [distance, setDistance] = useState(editing ? String(editing.distanceMi) : '');
   // Round-trips as clock time, so editing shows "45:30" rather than "45.5".
   const [minutes, setMinutes] = useState(editing ? fmtDuration(editing.durationS) : '');
@@ -111,45 +108,11 @@ export default function LogRun() {
     ]);
   };
 
-  const yesterday = addDays(todayKey(), -1);
 
   return (
     <ModalShell title={editing ? 'Edit Run' : 'Log a Run'}>
       <Label text="When" />
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 }}>
-        <Chip
-          label="Today"
-          selected={date === todayKey() && !showCal}
-          onPress={() => {
-            setDate(todayKey());
-            setShowCal(false);
-          }}
-        />
-        <Chip
-          label="Yesterday"
-          selected={date === yesterday && !showCal}
-          onPress={() => {
-            setDate(yesterday);
-            setShowCal(false);
-          }}
-        />
-        <Chip
-          label={
-            date !== todayKey() && date !== yesterday ? fmtLongDate(date).replace(/^\w+, /, '') : 'Pick a date'
-          }
-          selected={showCal || (date !== todayKey() && date !== yesterday)}
-          onPress={() => setShowCal((v) => !v)}
-        />
-      </View>
-      {showCal ? (
-        <DatePicker
-          value={date}
-          onChange={(k) => {
-            setDate(k);
-            setShowCal(false);
-          }}
-        />
-      ) : null}
+      <WhenPicker value={date} onChange={setDate} />
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>

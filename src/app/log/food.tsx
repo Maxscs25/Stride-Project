@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ModalShell, finishLogging } from '@/components/ModalShell';
+import { WhenPicker } from '@/components/WhenPicker';
 import { Chip, Field, UpsellCard } from '@/components/ui';
 import { searchFoods } from '@/lib/food';
 import { todayKey } from '@/lib/format';
@@ -31,6 +32,7 @@ export default function LogFood() {
   // The scanner returns a resolved item via params (JSON) when a barcode hits.
   const params = useLocalSearchParams<{ scanned?: string }>();
 
+  const [date, setDate] = useState(todayKey());
   const [meal, setMeal] = useState<Meal>(mealForNow());
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodItem[]>([]);
@@ -70,7 +72,7 @@ export default function LogFood() {
   const save = (item: FoodItem, method: 'search' | 'barcode' | 'manual') => {
     const mult = Math.max(0.25, parseFloat(servings) || 1);
     logFood({
-      date: todayKey(),
+      date,
       meal,
       name: item.name,
       servings: mult,
@@ -97,7 +99,16 @@ export default function LogFood() {
 
   // ---------- Manual entry ----------
   if (manual) {
-    return <ManualEntry meal={meal} onMeal={setMeal} onCancel={() => setManual(false)} onSave={save} />;
+    return (
+      <ManualEntry
+        date={date}
+        onDate={setDate}
+        meal={meal}
+        onMeal={setMeal}
+        onCancel={() => setManual(false)}
+        onSave={save}
+      />
+    );
   }
 
   // ---------- Confirm a selected/scanned item ----------
@@ -106,6 +117,7 @@ export default function LogFood() {
     const favorite = favoriteFoods.find((f) => sameFood(f, selected));
     return (
       <ModalShell title="Add Food">
+        <WhenPicker value={date} onChange={setDate} />
         <MealPicker meal={meal} onChange={setMeal} />
         <View
           style={{
@@ -179,6 +191,7 @@ export default function LogFood() {
   // ---------- Search / scan / manual ----------
   return (
     <ModalShell title="Log Food">
+      <WhenPicker value={date} onChange={setDate} />
       <MealPicker meal={meal} onChange={setMeal} />
 
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
@@ -328,11 +341,15 @@ function MacroBox({ label, value, color }: { label: string; value: number; color
 }
 
 function ManualEntry({
+  date,
+  onDate,
   meal,
   onMeal,
   onCancel,
   onSave,
 }: {
+  date: string;
+  onDate: (d: string) => void;
   meal: Meal;
   onMeal: (m: Meal) => void;
   onCancel: () => void;
@@ -348,6 +365,7 @@ function ManualEntry({
 
   return (
     <ModalShell title="Manual Entry">
+      <WhenPicker value={date} onChange={onDate} />
       <MealPicker meal={meal} onChange={onMeal} />
       <Field label="Food name" value={name} onChangeText={setName} placeholder="e.g. Homemade smoothie" autoFocus />
       <Field label="Calories" value={kcal} onChangeText={setKcal} keyboardType="number-pad" placeholder="350" />
