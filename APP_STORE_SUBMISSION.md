@@ -64,6 +64,32 @@ Privacy Policy: https://maxscs25.github.io/Stride-Project/privacy.html
 **What's New** (first release)
 `The first release of Stride — your AI running coach for smarter training and fewer injuries. We'd love your feedback.`
 
+**What's New — 1.1.0**
+```
+Your weekly plan, VO2 max, and a big reliability fix.
+
+WEEKLY PLAN
+Set what each day is for — long run Sunday, workouts Tuesday and Friday, rest Saturday — then let Stride split your weekly goal across them. Today's target waits for you on the home screen.
+
+VO2 MAX
+Enter a recent race or time trial to see your estimated VO2 max, plus the times it predicts from a mile to a marathon.
+
+EDIT ANYTHING
+Tap any run or shoe to fix a distance, change the date, or delete it.
+
+SPLIT A RUN BETWEEN SHOES
+Shakeout in the trainers, workout in the racers? Divide one run's mileage across both, and each pair's mileage stays honest.
+
+ALSO
+• Weeks can start on Sunday or Monday
+• Enter run times as mm:ss (45:30), not just whole minutes
+• Star the foods you eat often for one-tap logging
+• Food search is working again
+
+FIXED
+Runs could disappear and your weekly goal could reset if your session quietly expired in the background. Sessions now stay signed in, and anything you log while offline is kept and synced as soon as you're back.
+```
+
 ---
 
 ## 2. Metadata
