@@ -37,6 +37,9 @@ interface AppState extends SeedData {
   /** Recurring weekly template: what each weekday is for + target miles. */
   weekPlan: PlanDay[];
   setWeekPlan: (p: PlanDay[]) => void;
+  /** Apple Health workout UUIDs the user deleted. Kept after the run itself is
+   *  gone so the next sync doesn't import it straight back. */
+  dismissedExternalIds: string[];
   /** Writes not yet confirmed on the server; replayed on the next sign-in. */
   pending: PendingWrite[];
   queueWrite: (w: PendingWrite) => void;
@@ -129,6 +132,7 @@ export const useApp = create<AppState>()(
       demoMode: true,
       profile: DEFAULT_PROFILE,
       weekPlan: DEFAULT_WEEK_PLAN,
+      dismissedExternalIds: [],
       pending: [],
 
       setWeekPlan: (p) => set({ weekPlan: p }),
@@ -158,8 +162,17 @@ export const useApp = create<AppState>()(
 
       deleteRun: (id) =>
         set((s) => {
+          const gone = s.runs.find((r) => r.id === id);
           const runs = s.runs.filter((r) => r.id !== id);
-          return { runs, completions: recomputeRunTicks(s.completions, runs) };
+          return {
+            runs,
+            completions: recomputeRunTicks(s.completions, runs),
+            // Remember imported runs the user removed, or the Apple Health sync
+            // would see the workout as new again and re-add it.
+            dismissedExternalIds: gone?.externalId
+              ? [...new Set([...s.dismissedExternalIds, gone.externalId])]
+              : s.dismissedExternalIds,
+          };
         }),
 
       updateShoe: (shoe) =>
@@ -271,6 +284,7 @@ export const useApp = create<AppState>()(
           demoMode: true,
           profile: DEFAULT_PROFILE,
           weekPlan: DEFAULT_WEEK_PLAN,
+          dismissedExternalIds: [],
           pending: [],
         }),
     }),

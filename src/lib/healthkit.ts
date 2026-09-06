@@ -147,6 +147,13 @@ export async function syncHealthKitRuns(): Promise<number> {
 
   const app = useApp.getState();
   const known = new Set(app.runs.map((r) => r.externalId).filter(Boolean));
+  // Workouts the user deleted. Without this the delete removes the very record
+  // that marked the workout as already-seen, so the next sync re-adds it.
+  const dismissed = new Set(app.dismissedExternalIds);
+  // Manual runs are candidates to match against, so a workout that's already
+  // been logged by hand doesn't come back in as a second copy. Each can only
+  // absorb one workout, so genuine double days still import both.
+  const unclaimed = app.runs.filter((r) => !r.externalId);
   const { data: sess } = await supabase.auth.getSession();
   const uid = sess.session?.user.id;
 
@@ -154,7 +161,7 @@ export async function syncHealthKitRuns(): Promise<number> {
   const remoteRows: Record<string, unknown>[] = [];
   for (const w of runs) {
     const ext = String(w.uuid);
-    if (!ext || known.has(ext)) continue;
+    if (!ext || known.has(ext) || dismissed.has(ext)) continue;
     const meters = toMeters(w.totalDistance);
     const seconds = Math.round(toSeconds(w.duration));
     if (meters < 400 || seconds <= 0) {
@@ -162,6 +169,23 @@ export async function syncHealthKitRuns(): Promise<number> {
       continue; // skip fragments
     }
     const start = new Date(w.startDate);
+
+    // Same day and roughly the same distance as something already logged by
+    // hand — almost certainly the run the user entered while waiting for Apple
+    // Health to catch up.
+    const day = dateKey(start);
+    const miles = meters / 1609.34;
+    const matchIdx = unclaimed.findIndex(
+      (r) => r.date === day && Math.abs(r.distanceMi - miles) <= Math.max(0.3, miles * 0.1)
+    );
+    if (matchIdx >= 0) {
+      const [claimed] = unclaimed.splice(matchIdx, 1);
+      console.log(
+        `[healthkit] ${ext.slice(0, 8)} matches manual run on ${day} ` +
+          `(${claimed.distanceMi} vs ${round1(miles)} mi) — not importing a duplicate`
+      );
+      continue;
+    }
     const run = {
       id: uuid(),
       date: dateKey(start),
