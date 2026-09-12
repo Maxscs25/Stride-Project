@@ -20,6 +20,7 @@ export default function Profile() {
   const profile = useApp((s) => s.profile);
   const setWeeklyGoal = useApp((s) => s.setWeeklyGoal);
   const setProfile = useApp((s) => s.setProfile);
+  const crossRatio = profile.crossMinutesPerMile ?? 10;
   const resetDemo = useApp((s) => s.resetDemo);
 
   const confirmReset = () => {
@@ -211,6 +212,52 @@ export default function Profile() {
                 </Pressable>
               );
             })}
+          </View>
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingVertical: 10,
+          }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 14 }}>Cross-training</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+              {crossRatio > 0
+                ? `${crossRatio} min counts as 1 equivalent mile`
+                : 'Not counted as mileage'}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Stepper
+              onPress={() => {
+                const next = Math.max(0, crossRatio - 1);
+                setProfile({ crossMinutesPerMile: next });
+                updateProfileRemote({ cross_minutes_per_mile: next });
+              }}
+              icon="remove"
+            />
+            <Text
+              style={{
+                color: colors.text,
+                fontSize: 16,
+                fontWeight: '800',
+                marginHorizontal: 12,
+                minWidth: 46,
+                textAlign: 'center',
+              }}>
+              {crossRatio > 0 ? `${crossRatio} min` : 'Off'}
+            </Text>
+            <Stepper
+              onPress={() => {
+                const next = crossRatio + 1;
+                setProfile({ crossMinutesPerMile: next });
+                updateProfileRemote({ cross_minutes_per_mile: next });
+              }}
+              icon="add"
+            />
           </View>
         </View>
       </Card>

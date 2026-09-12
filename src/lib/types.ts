@@ -162,6 +162,9 @@ export interface Profile {
   personalGoalDate?: string;
   /** 0 = weeks start Sunday, 1 = Monday. */
   weekStartsOn: 0 | 1;
+  /** Minutes of cross-training counted as one equivalent mile. 0 turns the
+   *  equivalent off, so charts and totals show running only. */
+  crossMinutesPerMile: number;
   /** A recent race/time-trial, stored raw so VDOT can be recomputed from it. */
   vo2BaselineMeters?: number;
   vo2BaselineSeconds?: number;

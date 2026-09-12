@@ -75,6 +75,43 @@ export function weeklyMileSeries(runs: Run[], nWeeks: number) {
   return out;
 }
 
+/**
+ * Cross-training expressed as equivalent running miles, at the user's own
+ * conversion (default 10 min = 1 mi). A rule of thumb the runner sets, not a
+ * physiological claim — so it's shown alongside real mileage, never folded
+ * into it, and never feeds the training-load engine.
+ */
+export function crossMiles(sessions: CrossSession[], minutesPerMile: number): number {
+  if (!(minutesPerMile > 0)) return 0;
+  return round1(sessions.reduce((a, c) => a + c.minutes, 0) / minutesPerMile);
+}
+
+/** Equivalent cross-training miles on one date. */
+export function crossMilesOn(
+  cross: CrossSession[],
+  date: string,
+  minutesPerMile: number
+): number {
+  return crossMiles(
+    cross.filter((c) => c.date === date),
+    minutesPerMile
+  );
+}
+
+/** Equivalent cross-training miles for the week containing today minus N weeks. */
+export function weeklyCrossMiles(
+  cross: CrossSession[],
+  weeksBack: number,
+  minutesPerMile: number
+): number {
+  const start = addDays(weekStartKey(todayKey()), -7 * weeksBack);
+  const end = addDays(start, 6);
+  return crossMiles(
+    cross.filter((c) => c.date >= start && c.date <= end),
+    minutesPerMile
+  );
+}
+
 /** Miles a single run contributes to one shoe, honouring any split. */
 export function runMilesForShoe(run: Run, shoeId: string): number {
   if (run.shoeSplits?.length) {

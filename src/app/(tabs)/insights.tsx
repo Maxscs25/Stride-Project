@@ -8,7 +8,13 @@ import { BarChart, Heatmap, LoadChart, SparkBars } from '@/components/charts';
 import { Card, Screen, SectionHeader, UpsellCard } from '@/components/ui';
 import { addDays, fmtDate, parseKey, todayKey } from '@/lib/format';
 import { generateInsight, useInsights } from '@/lib/insights';
-import { buildInsight, loadSeries, symptomMentions, weeklyMileSeries } from '@/lib/load';
+import {
+  buildInsight,
+  loadSeries,
+  symptomMentions,
+  weeklyCrossMiles,
+  weeklyMileSeries,
+} from '@/lib/load';
 import { useIsPremium } from '@/lib/purchases';
 import { useAuth } from '@/lib/sync';
 import { bodyPartLabel, useSymptoms } from '@/lib/symptoms';
@@ -24,7 +30,13 @@ export default function Insights() {
   const shoes = useApp((s) => s.shoes);
   const profile = useApp((s) => s.profile);
 
+  const crossRatio = profile.crossMinutesPerMile ?? 10;
   const weekly = useMemo(() => weeklyMileSeries(runs, 8), [runs]);
+  // Index 0 is the oldest of the 8 weeks, so weeksBack counts down from 7.
+  const weeklyCross = useMemo(
+    () => weekly.map((_, i) => weeklyCrossMiles(cross, weekly.length - 1 - i, crossRatio)),
+    [weekly, cross, crossRatio]
+  );
   const series = useMemo(() => loadSeries(runs, cross, 56), [runs, cross]);
   const localInsight = useMemo(
     () => buildInsight({ runs, cross, journal, shoes }),
@@ -86,12 +98,16 @@ export default function Insights() {
           data={weekly.map((w, i) => ({
             label: `${parseKey(w.weekStart).getMonth() + 1}/${parseKey(w.weekStart).getDate()}`,
             value: w.miles,
+            cross: weeklyCross[i],
             highlight: i === weekly.length - 1,
           }))}
           goal={profile.weeklyGoalMi}
         />
-        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 8 }}>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 8, lineHeight: 16 }}>
           Dashed line = your {profile.weeklyGoalMi} mi weekly goal
+          {weeklyCross.some((c) => c > 0)
+            ? `. Lighter blue adds cross-training as equivalent miles at ${crossRatio} min = 1 mi.`
+            : ''}
         </Text>
       </Card>
 

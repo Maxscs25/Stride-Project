@@ -117,6 +117,7 @@ const DEFAULT_PROFILE: Profile = {
   weeklyGoalMi: 35,
   raceGoal: 'Sub-19 5K · Oct 10',
   weekStartsOn: 1,
+  crossMinutesPerMile: 10,
   goalReminder: 'off',
   goalReminderMinute: 480,
   heightCm: 178,

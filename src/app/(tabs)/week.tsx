@@ -14,7 +14,7 @@ import {
   todayKey,
   weekStartKey,
 } from '@/lib/format';
-import { typeRpe } from '@/lib/load';
+import { crossMiles, typeRpe } from '@/lib/load';
 import { crossKcal, dailyTargets, runKcal } from '@/lib/nutrition';
 import { ACTIVITY_META, WORKOUT_META, type CrossSession, type Run } from '@/lib/types';
 import { useApp } from '@/store';
@@ -25,6 +25,8 @@ const MAX_WEEKS_BACK = 25;
 interface DayAgg {
   date: string;
   miles: number;
+  /** Cross-training expressed as equivalent running miles. */
+  crossMi: number;
   runs: Run[];
   cross: CrossSession[];
   hasFelt: boolean;
@@ -37,6 +39,8 @@ export default function Week() {
   const journal = useApp((s) => s.journal);
   const foodLogs = useApp((s) => s.foodLogs);
   const profile = useApp((s) => s.profile);
+
+  const crossRatio = profile.crossMinutesPerMile ?? 10;
 
   const [weekOffset, setWeekOffset] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
@@ -67,15 +71,17 @@ export default function Week() {
         return {
           date: d,
           miles: round1(dayRuns.reduce((a, r) => a + r.distanceMi, 0)),
+          crossMi: crossMiles(dayCross, crossRatio),
           runs: dayRuns,
           cross: dayCross,
           hasFelt,
         };
       }),
-    [days, runs, cross, journal]
+    [days, runs, cross, journal, crossRatio]
   );
 
   const totalMiles = round1(perDay.reduce((a, p) => a + p.miles, 0));
+  const totalCrossMi = round1(perDay.reduce((a, p) => a + p.crossMi, 0));
   const totalRuns = perDay.reduce((a, p) => a + p.runs.length, 0);
   const totalSecs = perDay.reduce(
     (a, p) => a + p.runs.reduce((x, r) => x + r.durationS, 0),
@@ -136,6 +142,9 @@ export default function Week() {
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginBottom: 12 }}>
           <Text style={{ color: colors.text, fontSize: 34, fontWeight: '800', letterSpacing: -1 }}>
             {totalMiles}
+            {totalCrossMi > 0 ? (
+              <Text style={{ color: colors.info }}> ({round1(totalMiles + totalCrossMi)})</Text>
+            ) : null}
           </Text>
           <Text
             style={{
@@ -158,6 +167,12 @@ export default function Week() {
       {/* Interactive daily bar chart */}
       <Card>
         <WeekBars perDay={perDay} selectedKey={selectedKey} onSelect={setPicked} />
+        {totalCrossMi > 0 ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 10 }}>
+            <Legend color={colors.accent} label="Running" />
+            <Legend color={colors.info} label={`Cross-training (${crossRatio} min = 1 mi)`} />
+          </View>
+        ) : null}
         <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 10, textAlign: 'center' }}>
           Tap a day for the full breakdown
         </Text>
@@ -219,7 +234,8 @@ function WeekBars({
 }) {
   const { colors } = useTheme();
   const today = todayKey();
-  const max = Math.max(...perDay.map((p) => p.miles), 1) * 1.15;
+  // Scale to the stacked total so a big cross-training day can't overflow.
+  const max = Math.max(...perDay.map((p) => p.miles + p.crossMi), 1) * 1.15;
   const barArea = CHART_H - 18; // leave room for the value label
 
   return (
@@ -228,15 +244,15 @@ function WeekBars({
         const selected = p.date === selectedKey;
         const isToday = p.date === today;
         const runOnly = p.miles > 0;
-        const crossOnly = p.miles === 0 && p.cross.length > 0;
+        const hasCross = p.crossMi > 0;
         const barColor = selected
           ? colors.accent
           : runOnly
             ? colors.accent + '77'
-            : crossOnly
-              ? colors.info + '77'
-              : colors.surfaceAlt;
-        const h = runOnly ? Math.max(6, (p.miles / max) * barArea) : crossOnly ? 8 : 4;
+            : colors.surfaceAlt;
+        const scale = (v: number) => (v / max) * barArea;
+        const h = runOnly ? Math.max(6, scale(p.miles)) : hasCross ? 0 : 4;
+        const crossH = hasCross ? Math.max(4, scale(p.crossMi)) : 0;
         return (
           <Pressable
             key={p.date}
@@ -251,15 +267,32 @@ function WeekBars({
                   fontWeight: '800',
                   marginBottom: 3,
                 }}>
-                {p.miles > 0 ? p.miles : ''}
+                {/* "12 (15)" — run miles, then the total with cross-training. */}
+                {p.miles > 0 || hasCross
+                  ? hasCross
+                    ? `${p.miles} (${round1(p.miles + p.crossMi)})`
+                    : String(p.miles)
+                  : ''}
               </Text>
+              {hasCross ? (
+                <View
+                  style={{
+                    width: '58%',
+                    height: crossH,
+                    borderTopLeftRadius: 6,
+                    borderTopRightRadius: 6,
+                    backgroundColor: selected ? colors.info : colors.info + '77',
+                  }}
+                />
+              ) : null}
               <View
                 style={{
                   width: '58%',
                   height: h,
                   borderRadius: 6,
+                  ...(hasCross ? { borderTopLeftRadius: 0, borderTopRightRadius: 0 } : {}),
                   backgroundColor: barColor,
-                  borderWidth: selected ? 0 : crossOnly || runOnly ? 0 : 1,
+                  borderWidth: selected || runOnly || hasCross ? 0 : 1,
                   borderColor: colors.border,
                 }}
               />
@@ -281,6 +314,18 @@ function WeekBars({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}>
+      <View
+        style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color, marginRight: 5 }}
+      />
+      <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600' }}>{label}</Text>
     </View>
   );
 }

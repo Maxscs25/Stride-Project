@@ -11,12 +11,14 @@ export function BarChart({
   goal,
   height = 130,
 }: {
-  data: { label: string; value: number; highlight?: boolean }[];
+  /** `cross` stacks equivalent cross-training miles above the run bar. */
+  data: { label: string; value: number; cross?: number; highlight?: boolean }[];
   goal?: number;
   height?: number;
 }) {
   const { colors } = useTheme();
-  const max = Math.max(...data.map((d) => d.value), goal ?? 0, 1) * 1.15;
+  const total = (d: { value: number; cross?: number }) => d.value + (d.cross ?? 0);
+  const max = Math.max(...data.map(total), goal ?? 0, 1) * 1.15;
   return (
     <View>
       <View style={{ height, flexDirection: 'row', alignItems: 'flex-end' }}>
@@ -35,23 +37,45 @@ export function BarChart({
             }}
           />
         ) : null}
-        {data.map((d, i) => (
-          <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
-            <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '700', marginBottom: 3 }}>
-              {d.value > 0 ? Math.round(d.value) : ''}
-            </Text>
-            <View
-              style={{
-                width: '55%',
-                height: Math.max(3, (d.value / max) * height - 16),
-                borderRadius: 6,
-                backgroundColor: d.highlight ? colors.accent : colors.surfaceAlt,
-                borderWidth: d.highlight ? 0 : 1,
-                borderColor: colors.border,
-              }}
-            />
-          </View>
-        ))}
+        {data.map((d, i) => {
+          const cross = d.cross ?? 0;
+          const scale = (v: number) => (v / max) * (height - 16);
+          return (
+            <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+              <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '700', marginBottom: 3 }}>
+                {/* "12 (15)" — run miles, then the total including cross-training. */}
+                {d.value > 0 || cross > 0
+                  ? cross > 0
+                    ? `${Math.round(d.value)} (${Math.round(d.value + cross)})`
+                    : Math.round(d.value)
+                  : ''}
+              </Text>
+              {cross > 0 ? (
+                <View
+                  style={{
+                    width: '55%',
+                    height: Math.max(2, scale(cross)),
+                    borderTopLeftRadius: 6,
+                    borderTopRightRadius: 6,
+                    backgroundColor: colors.info,
+                  }}
+                />
+              ) : null}
+              <View
+                style={{
+                  width: '55%',
+                  height: Math.max(3, scale(d.value)),
+                  borderRadius: 6,
+                  // Square off where the cross-training block sits on top.
+                  ...(cross > 0 ? { borderTopLeftRadius: 0, borderTopRightRadius: 0 } : {}),
+                  backgroundColor: d.highlight ? colors.accent : colors.surfaceAlt,
+                  borderWidth: d.highlight ? 0 : 1,
+                  borderColor: colors.border,
+                }}
+              />
+            </View>
+          );
+        })}
       </View>
       <View style={{ flexDirection: 'row', marginTop: 6 }}>
         {data.map((d, i) => (
