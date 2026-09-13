@@ -195,10 +195,38 @@ what Apple's rejection looks like when you forget.
 
 ## 7. Screenshots
 
-Apple requires a set for the **6.9" display: 1290 × 2796 px** (covers all iPhones).
-Drafts captured from the app live in `store-assets/screenshots/`. For a polished
-listing, drop each into a device frame with a one-line headline (e.g. "Your AI
-injury-prevention coach", "See your running form", "Fuel for your training").
+Apple requires a set for the **6.9" display: 1290 × 2796 px** (covers all iPhones),
+and **caps a set at 10**. Captures live in `store-assets/screenshots/`.
+
+Capture them with the status bar pinned to Apple's convention, or the clock and
+battery vary shot to shot:
+
+```bash
+xcrun simctl status_bar booted override --time "9:41" --wifiBars 3 --cellularBars 4 --batteryState charged --batteryLevel 100
+```
+
+The simulators available here (16/17 Pro Max) render 1320 × 2868, so
+`scripts/resize-screenshots.sh` scales proportionally to 1290 wide and trims the
+7 px of surplus height — no stretching. Run it after capturing.
+
+### The 10 for 1.1.0
+
+| # | File | Why |
+|---|---|---|
+| 1 | `00-today-coach` | The AI coach — the reason to download |
+| 2 | `11-week-crosstraining` | **New** — stacked cross-training miles |
+| 3 | `12-weekly-plan` | **New** — the weekly plan |
+| 4 | `13-insights-weekly` | **Updated** — 8-week chart with equivalents |
+| 5 | `14-vo2-max` | **New** — VO2 max + equivalent race times |
+| 6 | `04-form-results` | Gait analysis — the big differentiator |
+| 7 | `03-fuel` | Nutrition |
+| 8 | `08-log-run-datepicker` | How fast logging is |
+| 9 | `10-journal` | The recovery journal the coach reads |
+| 10 | `02-training` | Training view |
+
+Retired from the live set: `01-insights` and `07-week-overview` (both superseded
+above), plus `05-profile-membership`, `06-coach-sharing`, and `09-onboarding` —
+the weakest three for conversion, and something has to go to fit 10.
 
 ---
 

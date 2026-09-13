@@ -86,18 +86,25 @@ export default function Vo2Screen() {
             {profile.vo2BaselineDate ? ` · set ${fmtDate(profile.vo2BaselineDate)}` : ''}
           </Text>
           {loadChange != null ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-              <Ionicons
-                name={loadChange >= 0 ? 'trending-up' : 'trending-down'}
-                size={15}
-                color={loadChange >= 0 ? colors.good : colors.warn}
-                style={{ marginRight: 6 }}
-              />
-              <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
-                Training load is {loadChange >= 0 ? 'up' : 'down'} {Math.abs(loadChange)}% since
-                then — retest to see where your fitness actually sits.
-              </Text>
-            </View>
+            // Under ±5% is noise, not a trend — and "up 0%" reads like a bug.
+            (() => {
+              const flat = Math.abs(loadChange) < 5;
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                  <Ionicons
+                    name={flat ? 'remove' : loadChange > 0 ? 'trending-up' : 'trending-down'}
+                    size={15}
+                    color={flat ? colors.textMuted : loadChange > 0 ? colors.good : colors.warn}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
+                    {flat
+                      ? 'Your training load is about where it was when you set this — retest after a solid block.'
+                      : `Training load is ${loadChange > 0 ? 'up' : 'down'} ${Math.abs(loadChange)}% since then — retest to see where your fitness actually sits.`}
+                  </Text>
+                </View>
+              );
+            })()
           ) : null}
         </Card>
       ) : null}
