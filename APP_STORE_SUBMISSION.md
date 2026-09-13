@@ -74,6 +74,9 @@ Set what each day is for — long run Sunday, workouts Tuesday and Friday, rest 
 VO2 MAX
 Enter a recent race or time trial to see your estimated VO2 max, plus the times it predicts from a mile to a marathon.
 
+CROSS-TRAINING AS MILES
+Count the bike, pool, and elliptical toward your week. Pick your own ratio — 10 minutes to the mile, or whatever you use — and cross-training stacks on the bar graph in its own color. Your real mileage still reads first: 12 (15).
+
 EDIT ANYTHING
 Tap any run or shoe to fix a distance, change the date, or delete it.
 
@@ -83,11 +86,14 @@ Shakeout in the trainers, workout in the racers? Divide one run's mileage across
 ALSO
 • Weeks can start on Sunday or Monday
 • Enter run times as mm:ss (45:30), not just whole minutes
+• Pick a past date when logging cross-training, meals, or a journal entry
 • Star the foods you eat often for one-tap logging
 • Food search is working again
 
 FIXED
 Runs could disappear and your weekly goal could reset if your session quietly expired in the background. Sessions now stay signed in, and anything you log while offline is kept and synced as soon as you're back.
+
+Apple Health no longer re-imports a run you already logged by hand, and a watch run you delete stays deleted.
 ```
 
 ---
@@ -182,15 +188,8 @@ Then in App Store Connect:
 
 Set secrets that the app needs at build time (EAS reads `.env`, or set them in the EAS dashboard): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_REVENUECAT_IOS_KEY`.
 
-**Bump `version` in app.json before every release build.** EAS auto-increments
-the *build* number (10, 11, …) but not the version string, and Apple rejects an
-upload whose `CFBundleShortVersionString` matches an already-approved release:
-
-> 90186: Invalid Pre-Release Train. The train version '1.0.0' is closed for new
-> build submissions.
-
-Bug fix → `1.0.1`, new features → `1.1.0`. The binary is fine when this happens;
-only the version stamp is wrong, so bump and rebuild.
+**Bump `version` in app.json before every release build** — see §9 for why and
+what Apple's rejection looks like when you forget.
 
 ---
 
@@ -210,11 +209,75 @@ injury-prevention coach", "See your running form", "Fuel for your training").
 - [x] Paywall wired (RevenueCat) — needs products created
 - [x] HealthKit usage strings in Info.plist
 - [x] Educational / not-medical disclaimers in-app
-- [ ] $99 Apple Developer account
-- [ ] App Store Connect app record + IAP products (REVENUECAT_SETUP.md)
-- [ ] RevenueCat API key set, release build
+- [x] $99 Apple Developer account
+- [x] App Store Connect app record + IAP products (REVENUECAT_SETUP.md)
+- [x] RevenueCat API key set, release build
 - [x] Privacy Policy URL hosted (GitHub Pages, docs/)
-- [ ] Reviewer demo account created
-- [ ] Screenshots framed to 1290×2796
-- [ ] Fill in the `[bracketed]` placeholders here and in legal.ts
+- [x] Reviewer demo account created
+- [x] Screenshots framed to 1290×2796
+- [x] Fill in the `[bracketed]` placeholders here and in legal.ts
+
+---
+
+## 9. Shipping the 1.1.0 update
+
+1.0.0 is already live, so everything in §1–§5 is done and stays as-is. An update
+only needs a new build, new release notes, and a submit.
+
+### What 1.1.0 contains
+
+| | |
+|---|---|
+| Weekly plan | Day types + goal split across the week |
+| VO2 max | Daniels–Gilbert from a baseline race, with race predictions |
+| Cross-training miles | Adjustable ratio, stacked on the week/insights charts |
+| Shoe splits | One run's mileage divided across multiple pairs |
+| Editing | Runs and shoes are editable and deletable |
+| Week start | Sunday or Monday |
+| mm:ss entry | Run times accept `45:30` |
+| Date pickers | Cross-training, food, and journal can backdate |
+| **Fix** | Runs disappearing / goal resetting on silent session expiry |
+| **Fix** | Apple Health re-importing runs already logged by hand |
+
+### Build and upload
+
+```bash
+npx eas-cli build --platform ios --profile production --non-interactive
+```
+
+Then submit the build it prints an ID for:
+
+```bash
+npx eas-cli submit --platform ios --id <BUILD_ID> --non-interactive
+```
+
+`eas` is not on the PATH in a non-login shell — use `npx eas-cli`, not bare `eas`.
+
+### In App Store Connect
+
+1. **My Apps → Stride → the `+` next to "iOS App"** → enter version `1.1.0`.
+   (Not the existing 1.0.0 page — that one is already released and read-only.)
+2. **What's New in This Version** → paste the 1.1.0 block from §1.
+3. **Build** → `+` → pick the build once it finishes processing (~10–20 min
+   after upload; you get an email when it's ready).
+4. **Version Release** → "Automatically release this version" is fine, or
+   "Manually release" if you want to time it with a video.
+5. Everything else — screenshots, description, privacy, pricing — carries over
+   from 1.0.0 untouched. Only change a screenshot if a new feature deserves one.
+6. **Add for Review → Submit to App Review.**
+
+Nothing here needs the IAP products re-reviewed; they were approved with 1.0.0
+and are unchanged.
+
+### Version bumps
+
+**Bump `version` in app.json before every release build.** EAS auto-increments
+the *build* number but not the version string, and Apple rejects an upload whose
+`CFBundleShortVersionString` matches an already-approved release:
+
+> 90186: Invalid Pre-Release Train. The train version '1.0.0' is closed for new
+> build submissions.
+
+Bug fix → `1.1.1`, new features → `1.2.0`. The binary is fine when this happens;
+only the version stamp is wrong, so bump and rebuild.
 ```
