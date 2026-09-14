@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -8,7 +8,6 @@ import { Card, ProgressBar, Screen, SectionHeader, UpsellCard } from '@/componen
 import { todayKey } from '@/lib/format';
 import { dailyTargets, fuelStatus } from '@/lib/nutrition';
 import { useIsPremium } from '@/lib/purchases';
-import { deleteFood } from '@/lib/sync';
 import { MEAL_META, type Meal } from '@/lib/types';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
@@ -166,8 +165,13 @@ export default function Fuel() {
                   .map((f) => (
                     <Pressable
                       key={f.id}
-                      onLongPress={() => deleteFood(f.id)}
-                      style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
+                      onPress={() => router.push({ pathname: '/log/food', params: { id: f.id } })}
+                      style={({ pressed }) => ({
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingVertical: 8,
+                        opacity: pressed ? 0.6 : 1,
+                      })}>
                       <View style={{ flex: 1, paddingRight: 8 }}>
                         <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
                           {f.name}
@@ -180,6 +184,12 @@ export default function Fuel() {
                       <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '700' }}>
                         {f.calories}
                       </Text>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={14}
+                        color={colors.textMuted}
+                        style={{ marginLeft: 6 }}
+                      />
                     </Pressable>
                   ))}
               </View>
@@ -187,7 +197,7 @@ export default function Fuel() {
         )}
         {todayFood.length > 0 ? (
           <Text style={{ color: colors.textMuted, fontSize: 11, paddingVertical: 6 }}>
-            Long-press an item to remove it.
+            Tap an item to edit or remove it.
           </Text>
         ) : null}
       </Card>

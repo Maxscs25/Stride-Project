@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -16,7 +17,13 @@ import {
 } from '@/lib/format';
 import { crossMiles, typeRpe } from '@/lib/load';
 import { crossKcal, dailyTargets, runKcal } from '@/lib/nutrition';
-import { ACTIVITY_META, WORKOUT_META, type CrossSession, type Run } from '@/lib/types';
+import {
+  ACTIVITY_META,
+  MEAL_META,
+  WORKOUT_META,
+  type CrossSession,
+  type Run,
+} from '@/lib/types';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
 
@@ -374,13 +381,21 @@ function DayDetail({
     )
   );
 
-  const consumed = foodLogs.filter((f) => f.date === day.date).reduce((a, f) => a + f.calories, 0);
+  const dayFood = foodLogs.filter((f) => f.date === day.date);
+  const consumed = dayFood.reduce((a, f) => a + f.calories, 0);
   const burned =
     day.runs.reduce((a, r) => a + runKcal(profile, r.distanceMi), 0) +
     day.cross.reduce((a, c) => a + crossKcal(profile, c), 0);
   const target = dailyTargets(profile, day.miles).targetKcal;
 
-  const empty = day.runs.length === 0 && day.cross.length === 0 && !hasFelt && !notes.length;
+  // Food counts toward "not empty" — otherwise a meal logged onto a rest day by
+  // mistake would be hidden behind the rest-day card with no way to reach it.
+  const empty =
+    day.runs.length === 0 &&
+    day.cross.length === 0 &&
+    !hasFelt &&
+    !notes.length &&
+    dayFood.length === 0;
 
   if (empty) {
     return (
@@ -406,14 +421,16 @@ function DayDetail({
             const rpe = r.rpe ?? typeRpe(r.type);
             const explicit = r.rpe != null;
             return (
-              <View
+              <Pressable
                 key={r.id}
-                style={{
+                onPress={() => router.push({ pathname: '/log/run', params: { id: r.id } })}
+                style={({ pressed }) => ({
                   paddingVertical: 12,
+                  opacity: pressed ? 0.6 : 1,
                   borderBottomWidth:
                     i === day.runs.length - 1 && !day.cross.length ? 0 : 1,
                   borderBottomColor: colors.border,
-                }}>
+                })}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <View
                     style={{
@@ -430,6 +447,12 @@ function DayDetail({
                   <Text style={{ color: colors.text, fontSize: 15, fontWeight: '800' }}>
                     {r.distanceMi} mi
                   </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={14}
+                    color={colors.textMuted}
+                    style={{ marginLeft: 6 }}
+                  />
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, marginLeft: 22 }}>
                   <Meta text={fmtDuration(r.durationS)} colors={colors} />
@@ -446,21 +469,23 @@ function DayDetail({
                     </Text>
                   </View>
                 </View>
-              </View>
+              </Pressable>
             );
           })}
           {day.cross.map((c, i) => {
             const meta = ACTIVITY_META[c.activity];
             return (
-              <View
+              <Pressable
                 key={c.id}
-                style={{
+                onPress={() => router.push({ pathname: '/log/cross', params: { id: c.id } })}
+                style={({ pressed }) => ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingVertical: 12,
+                  opacity: pressed ? 0.6 : 1,
                   borderBottomWidth: i === day.cross.length - 1 ? 0 : 1,
                   borderBottomColor: colors.border,
-                }}>
+                })}>
                 <Ionicons
                   name={meta.icon as keyof typeof Ionicons.glyphMap}
                   size={16}
@@ -478,7 +503,13 @@ function DayDetail({
                 <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '800' }}>
                   {c.minutes} min
                 </Text>
-              </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={14}
+                  color={colors.textMuted}
+                  style={{ marginLeft: 6 }}
+                />
+              </Pressable>
             );
           })}
         </Card>
@@ -548,6 +579,43 @@ function DayDetail({
             sub="intake − burn"
           />
         </View>
+
+        {/* The Fuel tab only ever shows today, so this is the one place an entry
+            logged on the wrong date can be found and corrected. */}
+        {dayFood.length ? (
+          <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: colors.border }}>
+            {dayFood.map((f) => (
+              <Pressable
+                key={f.id}
+                onPress={() => router.push({ pathname: '/log/food', params: { id: f.id } })}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingTop: 10,
+                  opacity: pressed ? 0.6 : 1,
+                })}>
+                <Text
+                  style={{ color: colors.text, fontSize: 14, fontWeight: '600', flex: 1 }}
+                  numberOfLines={1}>
+                  {f.name}
+                  {f.servings !== 1 ? `  ×${f.servings}` : ''}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginRight: 8 }}>
+                  {MEAL_META[f.meal].label}
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '700' }}>
+                  {f.calories}
+                </Text>
+                <Ionicons
+                  name="chevron-forward"
+                  size={14}
+                  color={colors.textMuted}
+                  style={{ marginLeft: 6 }}
+                />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
       </Card>
     </>
   );

@@ -457,6 +457,28 @@ export function logFood(input: Omit<FoodLog, 'id'>) {
   }, 'food');
 }
 
+/** Edit a logged food entry. `entry_method` is deliberately not sent — how the
+ *  item was originally found (barcode/search) stays true after a correction. */
+export function updateFood(food: FoodLog) {
+  useApp.getState().updateFood(food);
+  push(
+    'food_logs',
+    food.id,
+    {
+      local_date: food.date,
+      meal: food.meal,
+      custom_name: food.name.slice(0, 120),
+      servings: food.servings,
+      calories: food.calories,
+      protein_g: food.proteinG,
+      carbs_g: food.carbsG,
+      fat_g: food.fatG,
+    },
+    'food',
+    'update'
+  );
+}
+
 export function deleteFood(id: string) {
   useApp.getState().deleteFood(id);
   pushDelete('food_logs', id, 'food');
@@ -507,6 +529,30 @@ export function updateRun(run: Run) {
 export function deleteRun(id: string) {
   useApp.getState().deleteRun(id);
   pushDelete('runs', id, 'run');
+}
+
+/** Edit an existing cross-training session — most often to move one that was
+ *  logged on the wrong day. */
+export function updateCross(session: CrossSession) {
+  useApp.getState().updateCross(session);
+  push(
+    'cross_training',
+    session.id,
+    {
+      local_date: session.date,
+      activity_type: session.activity,
+      duration_min: session.minutes,
+      intensity: session.intensity ?? null,
+      notes: session.note ?? null,
+    },
+    'cross-training',
+    'update'
+  );
+}
+
+export function deleteCross(id: string) {
+  useApp.getState().deleteCross(id);
+  pushDelete('cross_training', id, 'cross-training');
 }
 
 /** Save the weekly template. Small enough to write whole rather than diff. */

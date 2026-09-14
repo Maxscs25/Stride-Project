@@ -50,9 +50,12 @@ interface AppState extends SeedData {
   updateShoe: (s: Shoe) => void;
   deleteShoe: (id: string) => void;
   logCross: (c: WithOptionalId<CrossSession>) => void;
+  updateCross: (c: CrossSession) => void;
+  deleteCross: (id: string) => void;
   addJournal: (j: WithOptionalId<JournalEntry>) => void;
   addShoe: (s: WithOptionalId<Shoe>) => void;
   logFood: (f: WithOptionalId<FoodLog>) => void;
+  updateFood: (f: FoodLog) => void;
   deleteFood: (id: string) => void;
   addFavoriteFood: (f: WithOptionalId<FavoriteFood>) => void;
   removeFavoriteFood: (id: string) => void;
@@ -197,6 +200,13 @@ export const useApp = create<AppState>()(
       logCross: (c) =>
         set((s) => ({ cross: [...s.cross, { ...c, id: c.id ?? uid() }] })),
 
+      updateCross: (session) =>
+        set((s) => ({ cross: s.cross.map((c) => (c.id === session.id ? session : c)) })),
+
+      // No externalId handling here, unlike deleteRun — cross-training is only
+      // ever entered by hand, so there's no Health import to re-dedupe against.
+      deleteCross: (id) => set((s) => ({ cross: s.cross.filter((c) => c.id !== id) })),
+
       addJournal: (j) =>
         set((s) => ({
           journal: [...s.journal, { ...j, id: j.id ?? uid() }],
@@ -211,6 +221,9 @@ export const useApp = create<AppState>()(
 
       logFood: (f) =>
         set((s) => ({ foodLogs: [...s.foodLogs, { ...f, id: f.id ?? uid() }] })),
+
+      updateFood: (food) =>
+        set((s) => ({ foodLogs: s.foodLogs.map((f) => (f.id === food.id ? food : f)) })),
 
       deleteFood: (id) =>
         set((s) => ({ foodLogs: s.foodLogs.filter((f) => f.id !== id) })),

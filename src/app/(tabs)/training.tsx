@@ -106,10 +106,10 @@ export default function Training() {
         {feed.map((item, i) => (
           <Pressable
             key={item.kind === 'run' ? item.run.id : item.cross.id}
-            onPress={
+            onPress={() =>
               item.kind === 'run'
-                ? () => router.push({ pathname: '/log/run', params: { id: item.run.id } })
-                : undefined
+                ? router.push({ pathname: '/log/run', params: { id: item.run.id } })
+                : router.push({ pathname: '/log/cross', params: { id: item.cross.id } })
             }
             style={{
               flexDirection: 'row',

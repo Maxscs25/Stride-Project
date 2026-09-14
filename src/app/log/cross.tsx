@@ -1,42 +1,69 @@
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { WhenPicker } from '@/components/WhenPicker';
 import { Chip, Field, Segmented } from '@/components/ui';
 import { todayKey } from '@/lib/format';
-import { logCross } from '@/lib/sync';
+import { deleteCross, logCross, updateCross } from '@/lib/sync';
 import { ACTIVITY_META, type ActivityType } from '@/lib/types';
+import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
 
 const ACTIVITIES = Object.entries(ACTIVITY_META) as [ActivityType, { label: string; icon: string }][];
 
 export default function LogCross() {
   const { colors } = useTheme();
+  const cross = useApp((s) => s.cross);
+  // Same form serves both jobs: with an `id` it edits that session instead.
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const editing = cross.find((c) => c.id === id);
 
-  const [date, setDate] = useState(todayKey());
-  const [activity, setActivity] = useState<ActivityType>('strength');
-  const [minutes, setMinutes] = useState('');
-  const [intensity, setIntensity] = useState<number | undefined>();
-  const [note, setNote] = useState('');
+  const [date, setDate] = useState(editing?.date ?? todayKey());
+  const [activity, setActivity] = useState<ActivityType>(editing?.activity ?? 'strength');
+  const [minutes, setMinutes] = useState(editing ? String(editing.minutes) : '');
+  const [intensity, setIntensity] = useState<number | undefined>(editing?.intensity);
+  const [note, setNote] = useState(editing?.note ?? '');
 
   const min = parseFloat(minutes);
   const valid = min > 0;
 
   const save = () => {
     if (!valid) return;
-    logCross({
+    const fields = {
       date,
       activity,
       minutes: Math.round(min),
       intensity,
       note: note.trim() || undefined,
-    });
+    };
+    if (editing) {
+      updateCross({ ...editing, ...fields });
+      router.back();
+      return;
+    }
+    logCross(fields);
     finishLogging();
   };
 
+  const confirmDelete = () => {
+    if (!editing) return;
+    Alert.alert('Delete this session?', 'It will be removed from your training log.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteCross(editing.id);
+          router.back();
+        },
+      },
+    ]);
+  };
+
   return (
-    <ModalShell title="Cross-Training">
+    <ModalShell title={editing ? 'Edit Session' : 'Cross-Training'}>
       <Label text="When" />
       <WhenPicker value={date} onChange={setDate} />
 
@@ -106,9 +133,17 @@ export default function LogCross() {
             fontSize: 16,
             fontWeight: '800',
           }}>
-          Save Session
+          {editing ? 'Save Changes' : 'Save Session'}
         </Text>
       </Pressable>
+
+      {editing ? (
+        <Pressable onPress={confirmDelete} style={{ alignItems: 'center', paddingVertical: 16 }}>
+          <Text style={{ color: colors.danger, fontSize: 14, fontWeight: '700' }}>
+            Delete this session
+          </Text>
+        </Pressable>
+      ) : null}
     </ModalShell>
   );
 }

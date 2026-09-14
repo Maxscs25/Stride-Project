@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ModalShell, finishLogging } from '@/components/ModalShell';
 import { WhenPicker } from '@/components/WhenPicker';
@@ -9,8 +9,14 @@ import { Chip, Field, UpsellCard } from '@/components/ui';
 import { searchFoods } from '@/lib/food';
 import { todayKey } from '@/lib/format';
 import { useIsPremium } from '@/lib/purchases';
-import { addFavoriteFood, logFood, removeFavoriteFood } from '@/lib/sync';
-import { MEAL_META, type FavoriteFood, type FoodItem, type Meal } from '@/lib/types';
+import { addFavoriteFood, deleteFood, logFood, removeFavoriteFood, updateFood } from '@/lib/sync';
+import {
+  MEAL_META,
+  type FavoriteFood,
+  type FoodItem,
+  type FoodLog,
+  type Meal,
+} from '@/lib/types';
 import { useApp } from '@/store';
 import { radius, useTheme } from '@/theme';
 
@@ -30,7 +36,10 @@ function mealForNow(): Meal {
 export default function LogFood() {
   const { colors } = useTheme();
   // The scanner returns a resolved item via params (JSON) when a barcode hits.
-  const params = useLocalSearchParams<{ scanned?: string }>();
+  // An `id` instead means we're editing an entry that's already logged.
+  const params = useLocalSearchParams<{ scanned?: string; id?: string }>();
+  const foodLogs = useApp((s) => s.foodLogs);
+  const editing = foodLogs.find((f) => f.id === params.id);
 
   const [date, setDate] = useState(todayKey());
   const [meal, setMeal] = useState<Meal>(mealForNow());
@@ -84,6 +93,10 @@ export default function LogFood() {
     });
     finishLogging();
   };
+
+  // Ahead of the premium gate on purpose: correcting or removing something you
+  // already logged shouldn't stop working if a subscription lapses.
+  if (editing) return <EditEntry entry={editing} />;
 
   if (!premium) {
     return (
@@ -337,6 +350,97 @@ function MacroBox({ label, value, color }: { label: string; value: number; color
       <Text style={{ color, fontSize: 18, fontWeight: '800' }}>{value}</Text>
       <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600' }}>{label}</Text>
     </View>
+  );
+}
+
+/**
+ * Editing an entry that's already logged. Deliberately not folded into the
+ * search/scan flow above — the stored row holds already-scaled totals, so the
+ * only sane thing to edit is those numbers, not a fresh lookup.
+ */
+function EditEntry({ entry }: { entry: FoodLog }) {
+  const { colors } = useTheme();
+  const [date, setDate] = useState(entry.date);
+  const [meal, setMeal] = useState<Meal>(entry.meal);
+  const [name, setName] = useState(entry.name);
+  const [kcal, setKcal] = useState(String(entry.calories));
+  const [p, setP] = useState(String(entry.proteinG));
+  const [c, setC] = useState(String(entry.carbsG));
+  const [f, setF] = useState(String(entry.fatG));
+  const valid = name.trim().length > 0 && parseFloat(kcal) > 0;
+
+  const save = () => {
+    if (!valid) return;
+    updateFood({
+      ...entry,
+      date,
+      meal,
+      name: name.trim(),
+      calories: Math.round(parseFloat(kcal) || 0),
+      proteinG: Math.round(parseFloat(p) || 0),
+      carbsG: Math.round(parseFloat(c) || 0),
+      fatG: Math.round(parseFloat(f) || 0),
+    });
+    router.back();
+  };
+
+  const confirmDelete = () => {
+    Alert.alert('Delete this entry?', 'It will be removed from that day’s food log.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          deleteFood(entry.id);
+          router.back();
+        },
+      },
+    ]);
+  };
+
+  return (
+    <ModalShell title="Edit Entry">
+      <WhenPicker value={date} onChange={setDate} />
+      <MealPicker meal={meal} onChange={setMeal} />
+      <Field label="Food name" value={name} onChangeText={setName} />
+      <Field label="Calories" value={kcal} onChangeText={setKcal} keyboardType="number-pad" />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Field label="Protein (g)" value={p} onChangeText={setP} keyboardType="number-pad" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label="Carbs (g)" value={c} onChangeText={setC} keyboardType="number-pad" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label="Fat (g)" value={f} onChangeText={setF} keyboardType="number-pad" />
+        </View>
+      </View>
+      {entry.servings !== 1 ? (
+        <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 12 }}>
+          Logged as ×{entry.servings}. These totals already include that, so edit
+          them directly.
+        </Text>
+      ) : null}
+      <Pressable
+        onPress={save}
+        disabled={!valid}
+        style={{
+          backgroundColor: valid ? colors.accent : colors.surfaceAlt,
+          borderRadius: radius.md,
+          paddingVertical: 16,
+          alignItems: 'center',
+          marginTop: 6,
+        }}>
+        <Text style={{ color: valid ? colors.onAccent : colors.textMuted, fontSize: 16, fontWeight: '800' }}>
+          Save Changes
+        </Text>
+      </Pressable>
+      <Pressable onPress={confirmDelete} style={{ alignItems: 'center', paddingVertical: 16 }}>
+        <Text style={{ color: colors.danger, fontSize: 14, fontWeight: '700' }}>
+          Delete this entry
+        </Text>
+      </Pressable>
+    </ModalShell>
   );
 }
 
