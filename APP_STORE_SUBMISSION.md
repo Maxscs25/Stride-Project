@@ -78,7 +78,7 @@ CROSS-TRAINING AS MILES
 Count the bike, pool, and elliptical toward your week. Pick your own ratio — 10 minutes to the mile, or whatever you use — and cross-training stacks on the bar graph in its own color. Your real mileage still reads first: 12 (15).
 
 EDIT ANYTHING
-Tap any run or shoe to fix a distance, change the date, or delete it.
+Tap any run, shoe, cross-training session or meal to fix a number, move it to the right day, or delete it. Everything you log is now editable from the day it belongs to.
 
 SPLIT A RUN BETWEEN SHOES
 Shakeout in the trainers, workout in the racers? Divide one run's mileage across both, and each pair's mileage stays honest.
@@ -94,6 +94,8 @@ FIXED
 Runs could disappear and your weekly goal could reset if your session quietly expired in the background. Sessions now stay signed in, and anything you log while offline is kept and synced as soon as you're back.
 
 Apple Health no longer re-imports a run you already logged by hand, and a watch run you delete stays deleted.
+
+Food search could return nonsense from the open nutrition database — one burrito bowl claimed 3,500 g of protein. Impossible entries are now filtered out before they reach your log.
 ```
 
 ---
@@ -260,12 +262,14 @@ only needs a new build, new release notes, and a submit.
 | VO2 max | Daniels–Gilbert from a baseline race, with race predictions |
 | Cross-training miles | Adjustable ratio, stacked on the week/insights charts |
 | Shoe splits | One run's mileage divided across multiple pairs |
-| Editing | Runs and shoes are editable and deletable |
+| Editing | Runs, shoes, cross-training and food are editable and deletable |
 | Week start | Sunday or Monday |
 | mm:ss entry | Run times accept `45:30` |
 | Date pickers | Cross-training, food, and journal can backdate |
 | **Fix** | Runs disappearing / goal resetting on silent session expiry |
 | **Fix** | Apple Health re-importing runs already logged by hand |
+| **Fix** | Impossible nutrition data (a 3,500 g protein bowl) reaching the log |
+| **Fix** | Food entries on a past date being unreachable to edit or delete |
 
 ### Build and upload
 
@@ -286,8 +290,19 @@ npx eas-cli submit --platform ios --id <BUILD_ID> --non-interactive
 1. **My Apps → Stride → the `+` next to "iOS App"** → enter version `1.1.0`.
    (Not the existing 1.0.0 page — that one is already released and read-only.)
 2. **What's New in This Version** → paste the 1.1.0 block from §1.
-3. **Build** → `+` → pick the build once it finishes processing (~10–20 min
-   after upload; you get an email when it's ready).
+3. **Build** → `+` → **pick build 15.** Builds 11–15 all show as version
+   1.1.0 because each was an iteration on the same unreleased train, so go by
+   build *number*, not version. 15 is the only one with the cross-training and
+   food editing and the nutrition-data fix. It appears ~10–20 min after upload
+   (Apple emails when processing finishes).
+
+   | Build | What it was |
+   |---|---|
+   | 11 | first 1.1.0 feature cut |
+   | 12 | Apple Health re-import fix |
+   | 13 | cross-training equivalent miles |
+   | 14 | VO2 flat-load copy fix |
+   | **15** | **editing for cross-training + food, impossible-nutrition filter** |
 4. **Version Release** → "Automatically release this version" is fine, or
    "Manually release" if you want to time it with a video.
 5. Everything else — screenshots, description, privacy, pricing — carries over
