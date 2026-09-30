@@ -26,26 +26,87 @@ function firstBrand(brands: unknown): string | undefined {
   return trimmed || undefined;
 }
 
+interface Macros {
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
+}
+
+// Deliberately loose. 100 g of food holds at most 100 g of anything and pure
+// fat is ~884 kcal, but real labels overshoot both — banana chips list macros
+// summing to 107 g, olive oil lists 914 kcal — because each figure is rounded
+// and measured independently. These bounds are set to catch the contributor
+// entering the wrong scale (values 100x out), not to police label arithmetic.
+const MAX_MACRO_PER_100G = 110;
+const MAX_MACRO_SUM_PER_100G = 115;
+const MAX_KCAL_PER_100G = 1000;
+// Nothing sold as a single serving carries this much. Deliberately loose —
+// only here to catch garbage on records that publish no per-100g block.
+const MAX_MACRO_PER_SERVING = 300;
+const MAX_KCAL_PER_SERVING = 3000;
+
+/**
+ * Open Food Facts is crowd-sourced and a real share of it is wrong by orders
+ * of magnitude. Searching "chipotle bowl" returns records claiming 3500 g of
+ * protein per 100 g — which is how a user logged a 3500 g protein bowl.
+ *
+ * These are rejected rather than rescaled: the bad rows here are uniformly
+ * 100x too large, but inferring that is guesswork, and quietly inventing a
+ * plausible-looking number is worse than showing one fewer search result.
+ */
+function plausible(m: Macros, basis: '100g' | 'serving'): boolean {
+  const all = [m.kcal, m.p, m.c, m.f];
+  if (all.some((v) => !Number.isFinite(v) || v < 0)) return false;
+  if (basis === '100g') {
+    if (m.p > MAX_MACRO_PER_100G || m.c > MAX_MACRO_PER_100G || m.f > MAX_MACRO_PER_100G) {
+      return false;
+    }
+    if (m.p + m.c + m.f > MAX_MACRO_SUM_PER_100G) return false;
+    return m.kcal <= MAX_KCAL_PER_100G;
+  }
+  if (m.p > MAX_MACRO_PER_SERVING || m.c > MAX_MACRO_PER_SERVING || m.f > MAX_MACRO_PER_SERVING) {
+    return false;
+  }
+  return m.kcal <= MAX_KCAL_PER_SERVING;
+}
+
 // Prefer per-serving values; fall back to per-100g.
 function normalize(product: Record<string, any>): FoodItem | null {
   const n = product?.nutriments ?? {};
   const name: string = product?.product_name?.trim() || product?.generic_name?.trim() || '';
   if (!name) return null;
 
-  const perServing =
-    n['energy-kcal_serving'] != null || n['proteins_serving'] != null;
-  const suffix = perServing ? '_serving' : '_100g';
-  const kcal = num(n[`energy-kcal${suffix}`]) || num(n[`energy-kcal_100g`]);
+  const read = (suffix: '_serving' | '_100g'): Macros => ({
+    kcal: num(n[`energy-kcal${suffix}`]),
+    p: num(n[`proteins${suffix}`]),
+    c: num(n[`carbohydrates${suffix}`]),
+    f: num(n[`fat${suffix}`]),
+  });
+
+  // Both must be present, or we'd pair per-serving macros with per-100g
+  // calories and silently misreport the entry.
+  const perServing = n['energy-kcal_serving'] != null && n['proteins_serving'] != null;
+  const per100 = read('_100g');
+
+  // Almost every record carries a per-100g block, and it's the clearest tell
+  // that a contributor used the wrong scale — check it even when displaying
+  // per-serving values.
+  const has100 = per100.kcal > 0 || per100.p > 0 || per100.c > 0 || per100.f > 0;
+  if (has100 && !plausible(per100, '100g')) return null;
+
+  const shown = perServing ? read('_serving') : per100;
+  if (!plausible(shown, perServing ? 'serving' : '100g')) return null;
 
   return {
     name,
     brand: firstBrand(product?.brands),
     servingDesc: perServing ? product?.serving_size || '1 serving' : '100 g',
     barcode: product?.code,
-    calories: Math.round(kcal),
-    proteinG: Math.round(num(n[`proteins${suffix}`])),
-    carbsG: Math.round(num(n[`carbohydrates${suffix}`])),
-    fatG: Math.round(num(n[`fat${suffix}`])),
+    calories: Math.round(shown.kcal),
+    proteinG: Math.round(shown.p),
+    carbsG: Math.round(shown.c),
+    fatG: Math.round(shown.f),
   };
 }
 
